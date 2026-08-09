@@ -15,25 +15,26 @@ import {
 
 import type { Song } from "@/lib/songs";
 
+const DEFAULT_COVER =
+  "/songs/default-cover.jpg";
+
 const emptyForm = {
   title: "",
   artist: "",
   cover: "",
   spotifyUrl: "",
   note: "",
-  albums: "",
   favorite: false,
-  featured: false,
-  glow: false,
-  duration: "",
-  memoryIds: "",
 };
 
+type SongForm = typeof emptyForm;
+
 export default function SongsAdminPage() {
-  const [songs, setSongs] = useState<Song[]>([]);
+  const [songs, setSongs] =
+    useState<Song[]>([]);
 
   const [form, setForm] =
-    useState(emptyForm);
+    useState<SongForm>(emptyForm);
 
   const [loading, setLoading] =
     useState(true);
@@ -43,6 +44,9 @@ export default function SongsAdminPage() {
 
   const [message, setMessage] =
     useState("");
+
+  const [editingId, setEditingId] =
+    useState<string | null>(null);
 
   async function loadSongs() {
     try {
@@ -68,13 +72,43 @@ export default function SongsAdminPage() {
   }, []);
 
   function updateField(
-    field: keyof typeof emptyForm,
+    field: keyof SongForm,
     value: string | boolean
   ) {
     setForm((current) => ({
       ...current,
       [field]: value,
     }));
+  }
+
+  function resetForm() {
+    setForm(emptyForm);
+    setEditingId(null);
+  }
+
+  function startEditing(song: Song) {
+    setEditingId(song.id);
+
+    setForm({
+      title: song.title ?? "",
+      artist: song.artist ?? "",
+      cover:
+        song.cover === DEFAULT_COVER
+          ? ""
+          : song.cover ?? "",
+      spotifyUrl:
+        song.spotifyUrl ?? "",
+      note: song.note ?? "",
+      favorite:
+        song.favorite ?? false,
+    });
+
+    setMessage("");
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
   }
 
   async function handleSubmit(
@@ -100,52 +134,111 @@ export default function SongsAdminPage() {
       setSaving(true);
       setMessage("");
 
-      await addFirestoreSong({
+      /*
+       * Notes automatically control
+       * the golden glow.
+       */
+      const hasNote =
+        form.note.trim().length > 0;
+
+      const existingSong =
+        editingId
+          ? songs.find(
+              (song) =>
+                song.id === editingId
+            )
+          : undefined;
+
+      const songData = {
         title: form.title.trim(),
 
         artist: form.artist.trim(),
 
-        cover: form.cover.trim(),
+        cover:
+          form.cover.trim() ||
+          DEFAULT_COVER,
 
         spotifyUrl:
           form.spotifyUrl.trim(),
 
         note: form.note.trim(),
 
-        albums: form.albums
-          .split(",")
-          .map((item) => item.trim())
-          .filter(Boolean),
+        favorite:
+          form.favorite,
 
-        favorite: form.favorite,
+        featured:
+          existingSong?.featured ??
+          false,
 
-        featured: form.featured,
+        glow: hasNote,
 
-        glow: form.glow,
+        /*
+         * These fields remain part of
+         * the data model for future
+         * Memories / Collections work,
+         * but are no longer exposed
+         * in this form.
+         */
+        albums:
+          existingSong?.albums ??
+          [],
 
+        memoryIds:
+          existingSong?.memoryIds ??
+          [],
+
+        /*
+         * Playback metadata will
+         * eventually come from
+         * Spotify / the playback
+         * architecture.
+         */
         duration:
-          Number(form.duration) || 0,
+          existingSong?.duration ??
+          0,
 
-        memoryIds: form.memoryIds
-          .split(",")
-          .map((item) => item.trim())
-          .filter(Boolean),
+        /*
+         * Keep the existing audio
+         * source if one already exists.
+         * We are no longer asking the
+         * administrator to enter it.
+         */
+        audioUrl:
+          existingSong?.audioUrl ??
+          "",
+      };
 
-        addedAt: new Date().toISOString(),
-      });
+      if (editingId) {
+        await updateFirestoreSong(
+          editingId,
+          songData
+        );
 
-      setForm(emptyForm);
+        setMessage(
+          "Song updated successfully."
+        );
+      } else {
+        await addFirestoreSong({
+          ...songData,
+          addedAt:
+            new Date().toISOString(),
+        });
 
-      setMessage(
-        "Song added successfully."
-      );
+        setMessage(
+          "Song added successfully."
+        );
+      }
+
+      resetForm();
 
       await loadSongs();
     } catch (error) {
       console.error(error);
 
       setMessage(
-        "Something went wrong while adding the song."
+        editingId
+          ? "Something went wrong while updating the song."
+          : "Something went wrong while adding the song."
       );
     } finally {
       setSaving(false);
@@ -165,6 +258,10 @@ export default function SongsAdminPage() {
     try {
       await deleteFirestoreSong(id);
 
+      if (editingId === id) {
+        resetForm();
+      }
+
       setMessage(
         "Song deleted."
       );
@@ -183,13 +280,9 @@ export default function SongsAdminPage() {
     <main
       style={{
         minHeight: "100vh",
-
         padding:
           "40px 24px 160px",
-
-        background:
-          "#F6FAF5",
-
+        background: "#F6FAF5",
         color: "#3F5345",
       }}
     >
@@ -248,7 +341,8 @@ export default function SongsAdminPage() {
         {message && (
           <div
             style={{
-              padding: "14px 18px",
+              padding:
+                "14px 18px",
               borderRadius: 16,
               background:
                 "#EAF3EC",
@@ -260,7 +354,7 @@ export default function SongsAdminPage() {
           </div>
         )}
 
-        {/* ADD SONG */}
+        {/* SONG FORM */}
 
         <section
           style={{
@@ -272,15 +366,47 @@ export default function SongsAdminPage() {
             marginBottom: 30,
           }}
         >
-          <h2
+          <div
             style={{
-              marginTop: 0,
+              display: "flex",
+              justifyContent:
+                "space-between",
+              alignItems: "center",
+              gap: 20,
               marginBottom: 24,
-              fontSize: 28,
             }}
           >
-            Add Song
-          </h2>
+            <h2
+              style={{
+                margin: 0,
+                fontSize: 28,
+              }}
+            >
+              {editingId
+                ? "Edit Song"
+                : "Add Song"}
+            </h2>
+
+            {editingId && (
+              <button
+                type="button"
+                onClick={resetForm}
+                style={{
+                  border:
+                    "1px solid rgba(69,108,87,.18)",
+                  background: "white",
+                  color: "#456C57",
+                  borderRadius: 14,
+                  padding:
+                    "10px 14px",
+                  cursor: "pointer",
+                  fontWeight: 600,
+                }}
+              >
+                Cancel Edit
+              </button>
+            )}
+          </div>
 
           <form
             onSubmit={handleSubmit}
@@ -300,7 +426,7 @@ export default function SongsAdminPage() {
                   value
                 )
               }
-              placeholder="Then I Got Us"
+              placeholder="Enter the song title"
             />
 
             <Field
@@ -312,11 +438,11 @@ export default function SongsAdminPage() {
                   value
                 )
               }
-              placeholder="FLEJAN"
+              placeholder="Enter the artist name"
             />
 
             <Field
-              label="Cover Image URL"
+              label="Cover Image"
               value={form.cover}
               onChange={(value) =>
                 updateField(
@@ -324,7 +450,7 @@ export default function SongsAdminPage() {
                   value
                 )
               }
-              placeholder="/songs/then-i-got-us.jpg"
+              placeholder="Optional — Spotify cover will be used later"
             />
 
             <Field
@@ -336,27 +462,23 @@ export default function SongsAdminPage() {
                   value
                 )
               }
-              placeholder="https://open.spotify.com/track/..."
-            />
-
-            <Field
-              label="Duration (seconds)"
-              value={form.duration}
-              onChange={(value) =>
-                updateField(
-                  "duration",
-                  value
-                )
-              }
-              placeholder="218"
-              type="number"
+              placeholder="Paste the Spotify song link"
             />
 
             <div>
               <label
                 style={labelStyle}
               >
-                Why This Song?
+                Notes
+                <span
+                  style={{
+                    marginLeft: 6,
+                    fontWeight: 400,
+                    color: "#9A9A9A",
+                  }}
+                >
+                  (optional)
+                </span>
               </label>
 
               <textarea
@@ -367,121 +489,89 @@ export default function SongsAdminPage() {
                     event.target.value
                   )
                 }
-                placeholder="Why does this song matter to us?"
-                rows={4}
+                placeholder="Add a personal note about this song"
+                rows={5}
                 style={
                   textareaStyle
                 }
               />
+
+              <p
+                style={{
+                  margin:
+                    "8px 0 0",
+                  fontSize: 13,
+                  color: "#8A8A8A",
+                }}
+              >
+                Adding a note
+                automatically gives
+                the song its golden
+                glow.
+              </p>
             </div>
 
-            <Field
-              label="Collections"
-              value={form.albums}
-              onChange={(value) =>
-                updateField(
-                  "albums",
-                  value
-                )
-              }
-              placeholder="Our Songs, Favorites"
-            />
+            {/* FAVORITE */}
 
-            <Field
-              label="Memory IDs"
-              value={form.memoryIds}
-              onChange={(value) =>
-                updateField(
-                  "memoryIds",
-                  value
-                )
-              }
-              placeholder="first-ever-date, mall-date"
-            />
-
-            {/* OPTIONS */}
-
-            <div
+            <label
               style={{
-                display: "grid",
-                gridTemplateColumns:
-                  "repeat(3, 1fr)",
-                gap: 12,
+                display: "flex",
+                alignItems:
+                  "center",
+                gap: 10,
+                padding: 14,
+                borderRadius: 16,
+                background:
+                  "#F8FAF8",
+                cursor: "pointer",
+                fontWeight: 600,
               }}
             >
-              <Checkbox
-                label="Favorite"
+              <input
+                type="checkbox"
                 checked={
                   form.favorite
                 }
-                onChange={(value) =>
+                onChange={(event) =>
                   updateField(
                     "favorite",
-                    value
+                    event.target
+                      .checked
                   )
                 }
               />
 
-              <Checkbox
-                label="Featured"
-                checked={
-                  form.featured
-                }
-                onChange={(value) =>
-                  updateField(
-                    "featured",
-                    value
-                  )
-                }
-              />
-
-              <Checkbox
-                label="Golden Glow"
-                checked={
-                  form.glow
-                }
-                onChange={(value) =>
-                  updateField(
-                    "glow",
-                    value
-                  )
-                }
-              />
-            </div>
+              Favorite
+            </label>
 
             <button
               type="submit"
               disabled={saving}
               style={{
                 marginTop: 10,
-
                 border: "none",
-
                 borderRadius: 18,
-
                 padding: 17,
-
                 background:
                   "#456C57",
-
                 color: "white",
-
                 fontSize: 16,
-
                 fontWeight: 700,
-
                 cursor: saving
                   ? "default"
                   : "pointer",
-
                 opacity: saving
                   ? 0.7
                   : 1,
               }}
             >
               {saving
-                ? "Adding Song..."
-                : "Add Song"}
+                ? editingId
+                  ? "Saving Changes..."
+                  : "Adding Song..."
+                : editingId
+                  ? "Save Changes"
+                  : "Add Song"}
             </button>
           </form>
         </section>
@@ -542,7 +632,8 @@ export default function SongsAdminPage() {
                 borderRadius: 20,
                 background:
                   "#F8FAF8",
-                textAlign: "center",
+                textAlign:
+                  "center",
                 color: "#8A8A8A",
               }}
             >
@@ -631,56 +722,85 @@ export default function SongsAdminPage() {
                         marginTop: 8,
                       }}
                     >
-                      {song.featured && (
-                        <Tag>
-                          Featured
-                        </Tag>
-                      )}
-
                       {song.favorite && (
                         <Tag>
                           Favorite
                         </Tag>
                       )}
 
-                      {song.glow && (
+                      {song.note && (
                         <Tag>
-                          Glow
+                          ✦ Note
+                        </Tag>
+                      )}
+
+                      {song.spotifyUrl && (
+                        <Tag>
+                          Spotify
                         </Tag>
                       )}
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() =>
-                      handleDelete(
-                        song.id
-                      )
-                    }
+                  <div
                     style={{
-                      border:
-                        "1px solid rgba(180,60,60,.18)",
-
-                      background:
-                        "#FFF7F7",
-
-                      color:
-                        "#A44A4A",
-
-                      borderRadius: 14,
-
-                      padding:
-                        "10px 14px",
-
-                      cursor:
-                        "pointer",
-
-                      fontWeight: 600,
+                      display: "flex",
+                      gap: 8,
+                      flexShrink: 0,
                     }}
                   >
-                    Delete
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        startEditing(
+                          song
+                        )
+                      }
+                      style={{
+                        border:
+                          "1px solid rgba(69,108,87,.18)",
+                        background:
+                          "white",
+                        color:
+                          "#456C57",
+                        borderRadius:
+                          14,
+                        padding:
+                          "10px 14px",
+                        cursor:
+                          "pointer",
+                        fontWeight: 600,
+                      }}
+                    >
+                      Edit
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleDelete(
+                          song.id
+                        )
+                      }
+                      style={{
+                        border:
+                          "1px solid rgba(180,60,60,.18)",
+                        background:
+                          "#FFF7F7",
+                        color:
+                          "#A44A4A",
+                        borderRadius:
+                          14,
+                        padding:
+                          "10px 14px",
+                        cursor:
+                          "pointer",
+                        fontWeight: 600,
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -696,7 +816,6 @@ function Field({
   value,
   onChange,
   placeholder,
-  type = "text",
 }: {
   label: string;
   value: string;
@@ -704,7 +823,6 @@ function Field({
     value: string
   ) => void;
   placeholder?: string;
-  type?: string;
 }) {
   return (
     <div>
@@ -715,7 +833,7 @@ function Field({
       </label>
 
       <input
-        type={type}
+        type="text"
         value={value}
         onChange={(event) =>
           onChange(
@@ -726,46 +844,6 @@ function Field({
         style={inputStyle}
       />
     </div>
-  );
-}
-
-function Checkbox({
-  label,
-  checked,
-  onChange,
-}: {
-  label: string;
-  checked: boolean;
-  onChange: (
-    value: boolean
-  ) => void;
-}) {
-  return (
-    <label
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        padding: 14,
-        borderRadius: 16,
-        background:
-          "#F8FAF8",
-        cursor: "pointer",
-        fontWeight: 600,
-      }}
-    >
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(event) =>
-          onChange(
-            event.target.checked
-          )
-        }
-      />
-
-      {label}
-    </label>
   );
 }
 
@@ -782,9 +860,8 @@ function Tag({
         borderRadius: 999,
         background:
           "#EAF3EC",
-        color:
-          "#456C57",
-        fontSize: 11,
+        color: "#456C57",
+        fontSize: 12,
         fontWeight: 700,
       }}
     >
@@ -803,19 +880,29 @@ const labelStyle = {
 
 const inputStyle = {
   width: "100%",
-  boxSizing: "border-box" as const,
-  padding: "14px 16px",
-  borderRadius: 14,
+  boxSizing:
+    "border-box" as const,
   border:
-    "1px solid rgba(69,108,87,.16)",
-  background: "#FAFCFA",
+    "1px solid rgba(69,108,87,.15)",
+  borderRadius: 14,
+  padding:
+    "13px 14px",
+  fontSize: 15,
   outline: "none",
-  fontFamily:
-    "var(--font-serif)",
-  fontSize: 16,
+  background: "#FCFDFC",
 };
 
 const textareaStyle = {
-  ...inputStyle,
+  width: "100%",
+  boxSizing:
+    "border-box" as const,
+  border:
+    "1px solid rgba(69,108,87,.15)",
+  borderRadius: 14,
+  padding:
+    "13px 14px",
+  fontSize: 15,
+  outline: "none",
+  background: "#FCFDFC",
   resize: "vertical" as const,
 };
