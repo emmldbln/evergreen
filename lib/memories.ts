@@ -115,9 +115,7 @@ export function getAlbum(id: string) {
   );
 }
 
-export function getHomepageMemories(): HomepageMemory[] {
-  const albums = getAlbums();
-
+export function getHomepageMemories(albums: Album[]): HomepageMemory[] {
   const photos: HomepageMemory[] = [];
 
   albums.forEach((album) => {
