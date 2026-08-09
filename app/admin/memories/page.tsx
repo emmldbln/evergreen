@@ -19,14 +19,11 @@ import {
 } from "lucide-react";
 
 import {
-  addFirestoreAlbum,
   deleteFirestoreAlbum,
   getFirestoreAlbums,
-  updateFirestoreAlbum,
   type FirestoreAlbum,
 } from "@/lib/firestore/memories";
 
-import { uploadMemoryFile } from "@/lib/storage/memories";
 
 const EMPTY_FORM = {
   title: "",
@@ -236,158 +233,213 @@ export default function AdminMemoriesPage() {
   }
 
   async function handleCreateAlbum(
-    event: React.FormEvent
-  ) {
-    event.preventDefault();
+  event: React.FormEvent
+) {
+  event.preventDefault();
 
-    if (!form.title.trim()) {
-      setError(
-        "Please enter an album title."
-      );
+  if (!form.title.trim()) {
+    setError("Please enter an album title.");
+    return;
+  }
 
-      return;
-    }
+  if (!coverFile) {
+    setError("Please select a cover image.");
+    return;
+  }
 
-    if (!coverFile) {
-      setError(
-        "Please select a cover image."
-      );
+  try {
+    setSaving(true);
+    setError("");
+    setUploadStatus("Creating album...");
 
-      return;
-    }
-
-    try {
-      setSaving(true);
-      setError("");
-
-      setUploadStatus(
-        "Creating album..."
-      );
-
-      /*
-       * Create the Firestore document first.
-       * Firebase gives us the album ID that
-       * will be used for Storage paths.
-       */
-
-      const albumId =
-        await addFirestoreAlbum({
+    /*
+     * Create the album through the server API.
+     *
+     * The API:
+     * 1. Creates/gets the Evergreen/Memories folder
+     * 2. Creates the album folder in Google Drive
+     * 3. Creates the Firestore album document
+     * 4. Stores the Google Drive folder ID
+     */
+    const createResponse = await fetch(
+      "/api/memories/albums",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
           title: form.title.trim(),
           date: form.date,
-          location:
-            form.location.trim(),
+          location: form.location.trim(),
           story: form.story.trim(),
-          coverUrl: "",
-          media: [],
-        });
-
-      /*
-       * Upload cover.
-       */
-
-      setUploadStatus(
-        "Uploading cover image..."
-      );
-
-      const coverUrl =
-        await uploadMemoryFile(
-          coverFile,
-          albumId,
-          "cover"
-        );
-
-      /*
-       * Upload album media.
-       */
-
-      const mediaUrls: string[] = [];
-
-      for (
-        let index = 0;
-        index < mediaFiles.length;
-        index++
-      ) {
-        const media =
-          mediaFiles[index];
-
-        setUploadStatus(
-          `Uploading media ${index + 1} of ${mediaFiles.length}...`
-        );
-
-        const url =
-          await uploadMemoryFile(
-            media.file,
-            albumId,
-            "media"
-          );
-
-        mediaUrls.push(url);
+        }),
       }
+    );
 
-      /*
-       * Save the Storage URLs into
-       * the Firestore album.
-       */
+    const createData = await createResponse.json();
 
-      setUploadStatus(
-        "Saving album..."
+    if (!createResponse.ok) {
+      throw new Error(
+        createData.error ??
+          "Failed to create album."
       );
-
-      await updateFirestoreAlbum(
-        albumId,
-        {
-          coverUrl,
-          media: mediaUrls,
-        }
-      );
-
-      /*
-       * Refresh the CMS list.
-       */
-
-      setUploadStatus(
-        "Album created successfully."
-      );
-
-      await loadAlbums();
-
-      /*
-       * Clean up local previews.
-       */
-
-      if (coverPreview) {
-        URL.revokeObjectURL(
-          coverPreview
-        );
-      }
-
-      mediaFiles.forEach((media) => {
-        URL.revokeObjectURL(
-          media.previewUrl
-        );
-      });
-
-      setForm(EMPTY_FORM);
-      setCoverFile(null);
-      setCoverPreview("");
-      setMediaFiles([]);
-
-      setTimeout(() => {
-        setShowEditor(false);
-        setUploadStatus("");
-      }, 700);
-    } catch (err) {
-      console.error(err);
-
-      setError(
-        "Unable to create the album. Check the browser console for details."
-      );
-
-      setUploadStatus("");
-    } finally {
-      setSaving(false);
     }
+
+    const albumId =
+      createData.album?.id;
+
+    if (
+      typeof albumId !== "string" ||
+      !albumId
+    ) {
+      throw new Error(
+        "Album was created but no album ID was returned."
+      );
+    }
+
+    /*
+     * Upload the cover image to Google Drive.
+     */
+    setUploadStatus(
+      "Uploading cover image..."
+    );
+
+    const coverFormData = new FormData();
+
+    coverFormData.append(
+      "file",
+      coverFile
+    );
+
+    coverFormData.append(
+      "type",
+      "cover"
+    );
+
+    const coverResponse = await fetch(
+      `/api/memories/albums/${albumId}/upload`,
+      {
+        method: "POST",
+        body: coverFormData,
+      }
+    );
+
+    const coverData =
+      await coverResponse.json();
+
+    if (!coverResponse.ok) {
+      throw new Error(
+        coverData.error ??
+          "Failed to upload cover image."
+      );
+    }
+
+    /*
+     * Upload all selected album media.
+     */
+    for (
+      let index = 0;
+      index < mediaFiles.length;
+      index++
+    ) {
+      const media =
+        mediaFiles[index];
+
+      setUploadStatus(
+        `Uploading media ${index + 1} of ${mediaFiles.length}...`
+      );
+
+      const mediaFormData =
+        new FormData();
+
+      mediaFormData.append(
+        "file",
+        media.file
+      );
+
+      mediaFormData.append(
+        "type",
+        "media"
+      );
+
+      const mediaResponse =
+        await fetch(
+          `/api/memories/albums/${albumId}/upload`,
+          {
+            method: "POST",
+            body: mediaFormData,
+          }
+        );
+
+      const mediaData =
+        await mediaResponse.json();
+
+      if (!mediaResponse.ok) {
+        throw new Error(
+          mediaData.error ??
+            `Failed to upload media ${index + 1}.`
+        );
+      }
+    }
+
+    /*
+     * Everything finished successfully.
+     */
+    setUploadStatus(
+      "Album created successfully."
+    );
+
+    await loadAlbums();
+
+    /*
+     * Clean up local object URLs.
+     */
+    if (coverPreview) {
+      URL.revokeObjectURL(
+        coverPreview
+      );
+    }
+
+    mediaFiles.forEach((media) => {
+      URL.revokeObjectURL(
+        media.previewUrl
+      );
+    });
+
+    /*
+     * Reset the editor.
+     */
+    setForm(EMPTY_FORM);
+    setCoverFile(null);
+    setCoverPreview("");
+    setMediaFiles([]);
+
+    /*
+     * Give the user a brief success state
+     * before closing the editor.
+     */
+    setTimeout(() => {
+      setShowEditor(false);
+      setUploadStatus("");
+    }, 700);
+  } catch (err) {
+    console.error(
+      "Create album error:",
+      err
+    );
+
+    setError(
+      err instanceof Error
+        ? err.message
+        : "Unable to create the album."
+    );
+
+    setUploadStatus("");
+  } finally {
+    setSaving(false);
   }
+}
 
   async function handleDeleteAlbum(
     album: FirestoreAlbum
@@ -631,28 +683,33 @@ export default function AdminMemoriesPage() {
                     overflow: "hidden",
                   }}
                 >
-                  {album.coverUrl ? (
-                    <img
-                      src={
-                        album.coverUrl
-                      }
-                      alt={
-                        album.title
-                      }
-                      style={{
-                        width: "100%",
-                        height: "100%",
-                        objectFit:
-                          "cover",
-                      }}
-                    />
-                  ) : (
-                    <ImagePlus
-                      size={48}
-                      strokeWidth={1.5}
-                      color="#456C57"
-                    />
-                  )}
+                  {album.coverFileId ? (
+  <img
+    src={`/api/memories/files/${album.coverFileId}`}
+    alt={album.title}
+    style={{
+      width: "100%",
+      height: "100%",
+      objectFit: "cover",
+    }}
+  />
+) : album.coverUrl ? (
+  <img
+    src={album.coverUrl}
+    alt={album.title}
+    style={{
+      width: "100%",
+      height: "100%",
+      objectFit: "cover",
+    }}
+  />
+) : (
+  <ImagePlus
+    size={48}
+    strokeWidth={1.5}
+    color="#456C57"
+  />
+)}
                 </div>
 
                 {/* INFO */}

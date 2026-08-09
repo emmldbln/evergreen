@@ -3,6 +3,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
   getDocs,
   orderBy,
   query,
@@ -14,22 +15,26 @@ import { db } from "@/firebase/firestore";
 
 export interface FirestoreAlbum {
   id: string;
+
   title: string;
   date: string;
   location: string;
   story: string;
+
   coverUrl: string;
+  coverFileId?: string;
+
   media: string[];
+  mediaFileIds?: string[];
+
+  driveFolderId: string;
+
   createdAt?: unknown;
 }
 
 export type CreateAlbumData = Omit<
   FirestoreAlbum,
   "id" | "createdAt"
->;
-
-export type UpdateAlbumData = Partial<
-  CreateAlbumData
 >;
 
 const albumsCollection = collection(
@@ -45,24 +50,48 @@ export async function getFirestoreAlbums(): Promise<
     orderBy("createdAt", "desc")
   );
 
-  const snapshot = await getDocs(
-    albumsQuery
+  const snapshot =
+    await getDocs(albumsQuery);
+
+  return snapshot.docs.map(
+    (album) => ({
+      id: album.id,
+      ...album.data(),
+    })
+  ) as FirestoreAlbum[];
+}
+
+export async function getFirestoreAlbum(
+  id: string
+): Promise<FirestoreAlbum | null> {
+  const albumRef = doc(
+    db,
+    "albums",
+    id
   );
 
-  return snapshot.docs.map((album) => ({
-    id: album.id,
-    ...album.data(),
-  })) as FirestoreAlbum[];
+  const snapshot =
+    await getDoc(albumRef);
+
+  if (!snapshot.exists()) {
+    return null;
+  }
+
+  return {
+    id: snapshot.id,
+    ...snapshot.data(),
+  } as FirestoreAlbum;
 }
 
 export async function addFirestoreAlbum(
   album: CreateAlbumData
-): Promise<string> {
+) {
   const docRef = await addDoc(
     albumsCollection,
     {
       ...album,
-      createdAt: serverTimestamp(),
+      createdAt:
+        serverTimestamp(),
     }
   );
 
@@ -71,8 +100,8 @@ export async function addFirestoreAlbum(
 
 export async function updateFirestoreAlbum(
   id: string,
-  album: UpdateAlbumData
-): Promise<void> {
+  album: Partial<CreateAlbumData>
+) {
   const albumRef = doc(
     db,
     "albums",
@@ -87,7 +116,7 @@ export async function updateFirestoreAlbum(
 
 export async function deleteFirestoreAlbum(
   id: string
-): Promise<void> {
+) {
   const albumRef = doc(
     db,
     "albums",

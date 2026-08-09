@@ -6,7 +6,7 @@ import {
 
 export default function Page() {
   const albums = getAlbums();
-  const homepageMemories = getHomepageMemories();
+  const homepageMemories = getHomepageMemories(albums);
 
   return (
     <HomeScreen
