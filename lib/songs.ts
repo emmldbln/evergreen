@@ -7,6 +7,15 @@ export interface Song {
 
   cover: string;
 
+  /**
+   * Optional direct audio source used by the HTMLAudioElement
+   * in PlaybackProvider.
+   *
+   * Spotify URLs are kept separately because they are not
+   * direct audio files and cannot be used as an <audio> src.
+   */
+  audioUrl?: string;
+
   spotifyUrl: string;
 
   // Optional special message shown in the player
