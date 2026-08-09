@@ -1,13 +1,25 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
-import { X, ChevronLeft, ChevronRight, Play } from "lucide-react";
+import {
+  motion,
+} from "framer-motion";
+
+import {
+  X,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
+
 import Image from "next/image";
-import { Memory } from "./memories";
+
+import type {
+  HomepageMemory,
+} from "@/lib/memories";
+
 import { useEffect } from "react";
 
 interface Props {
-  memories: Memory[];
+  memories: HomepageMemory[];
   selectedIndex: number;
   onClose: () => void;
   onNext: () => void;
@@ -21,274 +33,388 @@ export default function MemoryModal({
   onNext,
   onPrevious,
 }: Props) {
-  const memory = memories[selectedIndex];
+  const memory =
+    memories[selectedIndex];
 
   useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-      if (e.key === "ArrowRight") onNext();
-      if (e.key === "ArrowLeft") onPrevious();
+    const handleKey = (
+      e: KeyboardEvent
+    ) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+
+      if (e.key === "ArrowRight") {
+        onNext();
+      }
+
+      if (e.key === "ArrowLeft") {
+        onPrevious();
+      }
     };
 
-    window.addEventListener("keydown", handleKey);
+    window.addEventListener(
+      "keydown",
+      handleKey
+    );
 
     return () => {
-      window.removeEventListener("keydown", handleKey);
+      window.removeEventListener(
+        "keydown",
+        handleKey
+      );
     };
-  }, [onClose, onNext, onPrevious]);
+  }, [
+    onClose,
+    onNext,
+    onPrevious,
+  ]);
 
   if (!memory) return null;
 
   const isVideo =
-    memory.image.endsWith(".mp4") ||
-    memory.image.endsWith(".mov") ||
-    memory.image.endsWith(".webm");
+    memory.image.toLowerCase().endsWith(
+      ".mp4"
+    ) ||
+    memory.image.toLowerCase().endsWith(
+      ".mov"
+    ) ||
+    memory.image.toLowerCase().endsWith(
+      ".webm"
+    );
 
   return (
-    <AnimatePresence>
+    <motion.div
+      initial={{
+        opacity: 0,
+      }}
+      animate={{
+        opacity: 1,
+      }}
+      exit={{
+        opacity: 0,
+      }}
+      transition={{
+        duration: 0.3,
+      }}
+      style={{
+        position: "fixed",
+        inset: 0,
+
+        background:
+          "rgba(18,24,18,.35)",
+
+        backdropFilter:
+          "blur(20px)",
+
+        WebkitBackdropFilter:
+          "blur(20px)",
+
+        display: "flex",
+
+        justifyContent:
+          "center",
+
+        alignItems: "center",
+
+        padding: 32,
+
+        zIndex: 3000,
+      }}
+    >
       <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: .3 }}
+        layout
+        initial={{
+          opacity: 0,
+          scale: 0.9,
+          y: 30,
+        }}
+        animate={{
+          opacity: 1,
+          scale: 1,
+          y: 0,
+        }}
+        exit={{
+          opacity: 0,
+          scale: 0.9,
+        }}
+        transition={{
+          duration: 0.45,
+        }}
         style={{
-          position: "fixed",
-          inset: 0,
+          position: "relative",
 
-          background: "rgba(18,24,18,.35)",
+          width:
+            "min(1100px,95vw)",
 
-          backdropFilter: "blur(20px)",
-          WebkitBackdropFilter: "blur(20px)",
+          maxHeight: "90vh",
 
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
+          overflow: "hidden",
 
-          padding: 32,
+          borderRadius: 30,
 
-          zIndex: 3000,
+          background:
+            "linear-gradient(180deg,#FFFDFB,#F8F3EC)",
+
+          boxShadow:
+            "0 40px 120px rgba(0,0,0,.25)",
+
+          display: "grid",
+
+          gridTemplateColumns:
+            "1.3fr .7fr",
         }}
       >
-        <motion.div
-          layout
-          initial={{
-            opacity: 0,
-            scale: .9,
-            y: 30,
-          }}
-          animate={{
-            opacity: 1,
-            scale: 1,
-            y: 0,
-          }}
-          exit={{
-            opacity: 0,
-            scale: .9,
-          }}
-          transition={{
-            duration: .45,
-          }}
+        {/* MEDIA */}
+
+        <div
           style={{
-            width: "min(1100px,95vw)",
-            maxHeight: "90vh",
-
-            overflow: "hidden",
-
-            borderRadius: 30,
+            position:
+              "relative",
 
             background:
-              "linear-gradient(180deg,#FFFDFB,#F8F3EC)",
+              "#EFF4EF",
 
-            boxShadow:
-              "0 40px 120px rgba(0,0,0,.25)",
-
-            display: "grid",
-
-            gridTemplateColumns:
-              "1.3fr .7fr",
+            minHeight: 650,
           }}
         >
-          {/* MEDIA */}
+          {isVideo ? (
+            <video
+              src={memory.image}
+              controls
+              autoPlay
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit:
+                  "contain",
+              }}
+            />
+          ) : (
+            <Image
+              src={memory.image}
+              alt={
+                memory.albumTitle
+              }
+              fill
+              sizes="900px"
+              style={{
+                objectFit:
+                  "contain",
+              }}
+            />
+          )}
+        </div>
+
+        {/* INFO */}
+
+        <div
+          style={{
+            padding:
+              "50px 42px",
+
+            overflowY:
+              "auto",
+          }}
+        >
+          <h1
+            style={{
+              color:
+                "#456C57",
+
+              fontFamily:
+                "var(--font-serif)",
+
+              fontSize: 42,
+
+              marginTop: 0,
+
+              marginBottom: 12,
+            }}
+          >
+            {memory.albumTitle}
+          </h1>
+
+          <p
+            style={{
+              color:
+                "#809083",
+
+              marginBottom: 8,
+            }}
+          >
+            {memory.date}
+          </p>
+
+          <p
+            style={{
+              color:
+                "#98A196",
+
+              marginBottom: 40,
+            }}
+          >
+            {memory.location}
+          </p>
 
           <div
             style={{
-              position: "relative",
-              background: "#EFF4EF",
-              minHeight: 650,
+              color:
+                "#56645A",
+
+              lineHeight: 2,
+
+              fontSize: 18,
+
+              whiteSpace:
+                "pre-line",
             }}
           >
-            {isVideo ? (
-              <video
-                src={memory.image}
-                controls
-                autoPlay
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  objectFit: "contain",
-                }}
-              />
-            ) : (
-              <Image
-                src={memory.image}
-                alt={memory.title}
-                fill
-                sizes="900px"
-                style={{
-                  objectFit: "contain",
-                }}
-              />
-            )}
+            {memory.story}
           </div>
+        </div>
 
-          {/* INFO */}
+        {/* CLOSE */}
 
-          <div
-            style={{
-              padding: "50px 42px",
+        <button
+          onClick={onClose}
+          aria-label="Close memory"
+          style={{
+            position:
+              "absolute",
 
-              overflowY: "auto",
-            }}
-          >
-            <h1
-              style={{
-                color: "#456C57",
+            top: 24,
 
-                fontFamily:
-                  "var(--font-serif)",
+            right: 24,
 
-                fontSize: 42,
+            width: 46,
 
-                marginBottom: 12,
-              }}
-            >
-              {memory.title}
-            </h1>
+            height: 46,
 
-            <p
-              style={{
-                color: "#809083",
-                marginBottom: 8,
-              }}
-            >
-              {memory.date}
-            </p>
+            borderRadius:
+              "50%",
 
-            <p
-              style={{
-                color: "#98A196",
-                marginBottom: 40,
-              }}
-            >
-              {memory.location}
-            </p>
+            border: "none",
 
-            <div
-              style={{
-                color: "#56645A",
+            cursor:
+              "pointer",
 
-                lineHeight: 2,
+            background:
+              "rgba(255,255,255,.8)",
 
-                fontSize: 18,
+            backdropFilter:
+              "blur(10px)",
 
-                whiteSpace: "pre-line",
-              }}
-            >
-              {memory.story}
-            </div>
-          </div>
+            display: "flex",
 
-          {/* CLOSE */}
+            alignItems:
+              "center",
 
-          <button
-            onClick={onClose}
-            style={{
-              position: "absolute",
+            justifyContent:
+              "center",
 
-              top: 24,
-              right: 24,
+            zIndex: 2,
+          }}
+        >
+          <X size={20} />
+        </button>
 
-              width: 46,
-              height: 46,
+        {/* LEFT */}
 
-              borderRadius: "50%",
+        <button
+          onClick={onPrevious}
+          aria-label="Previous memory"
+          style={{
+            position:
+              "absolute",
 
-              border: "none",
+            left: 24,
 
-              cursor: "pointer",
+            top: "50%",
 
-              background:
-                "rgba(255,255,255,.8)",
+            transform:
+              "translateY(-50%)",
 
-              backdropFilter: "blur(10px)",
-            }}
-          >
-            <X size={20} />
-          </button>
+            width: 54,
 
-          {/* LEFT */}
+            height: 54,
 
-          <button
-            onClick={onPrevious}
-            style={{
-              position: "absolute",
+            borderRadius:
+              "50%",
 
-              left: 24,
-              top: "50%",
+            border: "none",
 
-              transform:
-                "translateY(-50%)",
+            cursor:
+              "pointer",
 
-              width: 54,
-              height: 54,
+            background:
+              "rgba(255,255,255,.75)",
 
-              borderRadius: "50%",
+            backdropFilter:
+              "blur(12px)",
 
-              border: "none",
+            display: "flex",
 
-              cursor: "pointer",
+            alignItems:
+              "center",
 
-              background:
-                "rgba(255,255,255,.75)",
+            justifyContent:
+              "center",
 
-              backdropFilter: "blur(12px)",
-            }}
-          >
-            <ChevronLeft />
-          </button>
+            zIndex: 2,
+          }}
+        >
+          <ChevronLeft />
+        </button>
 
-          {/* RIGHT */}
+        {/* RIGHT */}
 
-          <button
-            onClick={onNext}
-            style={{
-              position: "absolute",
+        <button
+          onClick={onNext}
+          aria-label="Next memory"
+          style={{
+            position:
+              "absolute",
 
-              right: 24,
-              top: "50%",
+            right: 24,
 
-              transform:
-                "translateY(-50%)",
+            top: "50%",
 
-              width: 54,
-              height: 54,
+            transform:
+              "translateY(-50%)",
 
-              borderRadius: "50%",
+            width: 54,
 
-              border: "none",
+            height: 54,
 
-              cursor: "pointer",
+            borderRadius:
+              "50%",
 
-              background:
-                "rgba(255,255,255,.75)",
+            border: "none",
 
-              backdropFilter: "blur(12px)",
-            }}
-          >
-            <ChevronRight />
-          </button>
-        </motion.div>
+            cursor:
+              "pointer",
+
+            background:
+              "rgba(255,255,255,.75)",
+
+            backdropFilter:
+              "blur(12px)",
+
+            display: "flex",
+
+            alignItems:
+              "center",
+
+            justifyContent:
+              "center",
+
+            zIndex: 2,
+          }}
+        >
+          <ChevronRight />
+        </button>
       </motion.div>
-    </AnimatePresence>
+    </motion.div>
   );
 }

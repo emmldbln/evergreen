@@ -525,7 +525,7 @@ export default function SoundtrackScreen() {
               color: "#555",
             }}
           >
-            "{song.note}"
+            &ldquo;{song.note}&rdquo;
           </div>
         </section>
       )}

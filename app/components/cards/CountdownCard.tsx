@@ -3,37 +3,35 @@
 import { useEffect, useState } from "react";
 import GlassCard from "../ui/GlassCard";
 
-export default function CountdownCard() {
-  const anniversary = new Date("2022-05-18T00:00:00+08:00");
+const ANNIVERSARY = new Date("2022-05-18T00:00:00+08:00");
 
-  const calculateTime = () => {
-    const now = new Date();
+function calculateTime() {
+  const now = new Date();
 
-    const diff = now.getTime() - anniversary.getTime();
+  const diff = now.getTime() - ANNIVERSARY.getTime();
+  const totalSeconds = Math.floor(diff / 1000);
 
-    const totalSeconds = Math.floor(diff / 1000);
+  const days = Math.floor(totalSeconds / (60 * 60 * 24));
 
-    const days = Math.floor(totalSeconds / (60 * 60 * 24));
+  const hours = Math.floor(
+    (totalSeconds % (60 * 60 * 24)) / (60 * 60)
+  );
 
-    const hours = Math.floor(
-      (totalSeconds % (60 * 60 * 24)) / (60 * 60)
-    );
+  const minutes = Math.floor(
+    (totalSeconds % (60 * 60)) / 60
+  );
 
-    const minutes = Math.floor(
-      (totalSeconds % (60 * 60)) / 60
-    );
+  const seconds = totalSeconds % 60;
 
-    const seconds = totalSeconds % 60;
-
-    return {
-      days,
-      hours,
-      minutes,
-      seconds,
-    };
+  return {
+    days,
+    hours,
+    minutes,
+    seconds,
   };
+}
 
-  // Initial value stays identical on server and client
+export default function CountdownCard() {
   const [time, setTime] = useState({
     days: 0,
     hours: 0,
@@ -42,9 +40,6 @@ export default function CountdownCard() {
   });
 
   useEffect(() => {
-    // Calculate actual time after hydration
-    setTime(calculateTime());
-
     const interval = setInterval(() => {
       setTime(calculateTime());
     }, 1000);
@@ -68,7 +63,7 @@ export default function CountdownCard() {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(4,1fr)",
+          gridTemplateColumns: "repeat(4, 1fr)",
           gap: 14,
         }}
       >

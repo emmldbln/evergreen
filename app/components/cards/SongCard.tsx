@@ -501,7 +501,7 @@ export default function SongCard({
                     lineHeight: 1.8,
                   }}
                 >
-                  "{song.note}"
+                  &ldquo;{song.note}&rdquo;
                 </div>
               )}
                             {/* QUEUE */}
