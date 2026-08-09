@@ -2,8 +2,11 @@
 
 import {
   createContext,
+  useCallback,
   useContext,
+  useEffect,
   useMemo,
+  useRef,
   useState,
   ReactNode,
 } from "react";
@@ -13,266 +16,301 @@ import { getSongs } from "./songs";
 
 interface PlaybackContextType {
   currentSong: Song | null;
-
   playing: boolean;
-
+  currentTime: number;
+  duration: number;
   queue: Song[];
-
   shuffle: boolean;
   repeat: boolean;
-
   play: () => void;
   pause: () => void;
   togglePlayback: () => void;
-
   playSong: (song: Song) => void;
-
   nextSong: () => void;
   previousSong: () => void;
-
   setQueue: (songs: Song[]) => void;
-
   setShuffle: (value: boolean) => void;
   setRepeat: (value: boolean) => void;
+  seek: (time: number) => void;
 }
 
 const PlaybackContext =
-  createContext<PlaybackContextType | null>(
-    null
-  );
+  createContext<PlaybackContextType | null>(null);
 
 export function PlaybackProvider({
   children,
 }: {
   children: ReactNode;
 }) {
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const shouldAutoplayRef = useRef(false);
+
   const [currentSong, setCurrentSong] =
     useState<Song | null>(null);
+  const [playing, setPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [queue, setQueue] = useState<Song[]>(() => getSongs());
+  const [shuffle, setShuffle] = useState(false);
+  const [repeat, setRepeat] = useState(false);
 
-  const [playing, setPlaying] =
-    useState(false);
-
-  const [queue, setQueue] =
-    useState<Song[]>(() => getSongs());
-
-  const [shuffle, setShuffle] =
-    useState(false);
-
-  const [repeat, setRepeat] =
-    useState(false);
-
-  function play() {
+  const play = useCallback(() => {
     if (!currentSong) {
       const songs = getSongs();
-
       if (!songs.length) return;
 
+      shouldAutoplayRef.current = true;
       setCurrentSong(songs[0]);
-
-      setPlaying(true);
-
       return;
     }
 
-    setPlaying(true);
-  }
+    const audio = audioRef.current;
+    if (!audio || !currentSong.audioUrl) return;
 
-  function pause() {
+    void audio.play().catch(() => setPlaying(false));
+  }, [currentSong]);
+
+  const pause = useCallback(() => {
+    shouldAutoplayRef.current = false;
+    audioRef.current?.pause();
     setPlaying(false);
-  }
+  }, []);
 
-  function togglePlayback() {
+  const togglePlayback = useCallback(() => {
     if (!currentSong) {
       const songs = getSongs();
-
       if (!songs.length) return;
 
+      shouldAutoplayRef.current = true;
       setCurrentSong(songs[0]);
-      setPlaying(true);
-
       return;
     }
 
-    setPlaying(
-      (value) => !value
-    );
-  }
+    const audio = audioRef.current;
+    if (!audio || !currentSong.audioUrl) return;
 
-  function playSong(song: Song) {
+    if (audio.paused) {
+      void audio.play().catch(() => setPlaying(false));
+    } else {
+      audio.pause();
+    }
+  }, [currentSong]);
+
+  const playSong = useCallback((song: Song) => {
+    shouldAutoplayRef.current = true;
     setCurrentSong(song);
-    setPlaying(true);
+    setCurrentTime(0);
+    setDuration(song.duration || 0);
 
-    /*
-     * Make sure the selected song exists
-     * in the current queue.
-     */
     setQueue((currentQueue) => {
-      const exists =
-        currentQueue.some(
-          (item) => item.id === song.id
-        );
-
-      if (exists) {
+      if (currentQueue.some((item) => item.id === song.id)) {
         return currentQueue;
       }
 
-      return [
-        ...currentQueue,
-        song,
-      ];
+      return [...currentQueue, song];
     });
-  }
+  }, []);
 
-  function nextSong() {
+  const nextSong = useCallback(() => {
     if (!queue.length) return;
 
     if (!currentSong) {
-      setCurrentSong(queue[0]);
-      setPlaying(true);
-
+      playSong(queue[0]);
       return;
     }
 
-    const index =
-      queue.findIndex(
-        (song) =>
-          song.id === currentSong.id
-      );
+    const index = queue.findIndex(
+      (song) => song.id === currentSong.id
+    );
 
     if (index === -1) {
-      setCurrentSong(queue[0]);
-      setPlaying(true);
-
+      playSong(queue[0]);
       return;
     }
 
-    /*
-     * Repeat current song.
-     */
     if (repeat) {
-      setPlaying(true);
+      const audio = audioRef.current;
+      if (!audio) return;
+
+      audio.currentTime = 0;
+      void audio.play().catch(() => setPlaying(false));
       return;
     }
 
-    /*
-     * Shuffle.
-     */
     if (shuffle && queue.length > 1) {
-      const available =
-        queue.filter(
-          (song) =>
-            song.id !==
-            currentSong.id
-        );
-
-      const randomIndex =
-        Math.floor(
-          Math.random() *
-            available.length
-        );
-
-      setCurrentSong(
-        available[randomIndex]
+      const available = queue.filter(
+        (song) => song.id !== currentSong.id
+      );
+      const randomIndex = Math.floor(
+        Math.random() * available.length
       );
 
-      setPlaying(true);
-
+      playSong(available[randomIndex]);
       return;
     }
 
-    const nextIndex =
-      (index + 1) %
-      queue.length;
+    playSong(queue[(index + 1) % queue.length]);
+  }, [currentSong, playSong, queue, repeat, shuffle]);
 
-    setCurrentSong(
-      queue[nextIndex]
-    );
-
-    setPlaying(true);
-  }
-
-  function previousSong() {
+  const previousSong = useCallback(() => {
     if (!queue.length) return;
 
     if (!currentSong) {
-      setCurrentSong(queue[0]);
-      setPlaying(true);
-
+      playSong(queue[0]);
       return;
     }
 
-    const index =
-      queue.findIndex(
-        (song) =>
-          song.id === currentSong.id
-      );
+    const index = queue.findIndex(
+      (song) => song.id === currentSong.id
+    );
 
     if (index === -1) {
-      setCurrentSong(queue[0]);
-      setPlaying(true);
-
+      playSong(queue[0]);
       return;
     }
 
-    const previousIndex =
-      (index - 1 + queue.length) %
-      queue.length;
+    playSong(
+      queue[(index - 1 + queue.length) % queue.length]
+    );
+  }, [currentSong, playSong, queue]);
 
-    setCurrentSong(
-      queue[previousIndex]
+  const seek = useCallback((time: number) => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const nextTime = Math.max(
+      0,
+      Math.min(time, audio.duration || 0)
     );
 
-    setPlaying(true);
-  }
+    audio.currentTime = nextTime;
+    setCurrentTime(nextTime);
+  }, []);
 
-  const value =
-    useMemo(
-      () => ({
-        currentSong,
-        playing,
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio || !currentSong) return;
 
-        queue,
+    audio.pause();
+    audio.currentTime = 0;
+    setCurrentTime(0);
+    setDuration(currentSong.duration || 0);
+    setPlaying(false);
 
-        shuffle,
-        repeat,
+    if (!currentSong.audioUrl) {
+      shouldAutoplayRef.current = false;
+      return;
+    }
 
-        play,
-        pause,
-        togglePlayback,
+    audio.src = currentSong.audioUrl;
+    audio.load();
 
-        playSong,
+    if (shouldAutoplayRef.current) {
+      void audio.play().catch(() => {
+        setPlaying(false);
+      });
+      shouldAutoplayRef.current = false;
+    }
+  }, [currentSong]);
 
-        nextSong,
-        previousSong,
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
 
-        setQueue,
+    const handleTimeUpdate = () => {
+      setCurrentTime(audio.currentTime);
+    };
 
-        setShuffle,
-        setRepeat,
-      }),
-      [
-        currentSong,
-        playing,
-        queue,
-        shuffle,
-        repeat,
-      ]
-    );
+    const handleLoadedMetadata = () => {
+      if (Number.isFinite(audio.duration)) {
+        setDuration(audio.duration);
+      }
+    };
+
+    const handlePlay = () => setPlaying(true);
+    const handlePause = () => setPlaying(false);
+
+    const handleEnded = () => {
+      if (repeat) {
+        audio.currentTime = 0;
+        void audio.play().catch(() => setPlaying(false));
+        return;
+      }
+
+      nextSong();
+    };
+
+    const handleError = () => setPlaying(false);
+
+    audio.addEventListener("timeupdate", handleTimeUpdate);
+    audio.addEventListener("loadedmetadata", handleLoadedMetadata);
+    audio.addEventListener("play", handlePlay);
+    audio.addEventListener("pause", handlePause);
+    audio.addEventListener("ended", handleEnded);
+    audio.addEventListener("error", handleError);
+
+    return () => {
+      audio.removeEventListener("timeupdate", handleTimeUpdate);
+      audio.removeEventListener("loadedmetadata", handleLoadedMetadata);
+      audio.removeEventListener("play", handlePlay);
+      audio.removeEventListener("pause", handlePause);
+      audio.removeEventListener("ended", handleEnded);
+      audio.removeEventListener("error", handleError);
+    };
+  }, [nextSong, repeat]);
+
+  useEffect(() => {
+    return () => audioRef.current?.pause();
+  }, []);
+
+  const value = useMemo(
+    () => ({
+      currentSong,
+      playing,
+      currentTime,
+      duration,
+      queue,
+      shuffle,
+      repeat,
+      play,
+      pause,
+      togglePlayback,
+      playSong,
+      nextSong,
+      previousSong,
+      setQueue,
+      setShuffle,
+      setRepeat,
+      seek,
+    }),
+    [
+      currentSong,
+      playing,
+      currentTime,
+      duration,
+      queue,
+      shuffle,
+      repeat,
+      play,
+      pause,
+      togglePlayback,
+      playSong,
+      nextSong,
+      previousSong,
+      seek,
+    ]
+  );
 
   return (
-    <PlaybackContext.Provider
-      value={value}
-    >
+    <PlaybackContext.Provider value={value}>
+      <audio ref={audioRef} preload="metadata" />
       {children}
     </PlaybackContext.Provider>
   );
 }
 
 export function usePlayback() {
-  const context =
-    useContext(
-      PlaybackContext
-    );
+  const context = useContext(PlaybackContext);
 
   if (!context) {
     throw new Error(
