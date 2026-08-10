@@ -6,8 +6,11 @@ import {
   useState,
 } from "react";
 
+import Link from "next/link";
+
 import {
   CalendarDays,
+  Film,
   ImagePlus,
   MapPin,
   Plus,
@@ -15,14 +18,12 @@ import {
   Trash2,
   Upload,
   X,
-  Film,
 } from "lucide-react";
 
 import {
   getFirestoreAlbums,
   type FirestoreAlbum,
 } from "@/lib/firestore/memories";
-
 
 const EMPTY_FORM = {
   title: "",
@@ -70,10 +71,10 @@ export default function AdminMemoriesPage() {
     useState("");
 
   const coverInputRef =
-    useRef<HTMLInputElement>(null);
+    useRef<HTMLInputElement | null>(null);
 
   const mediaInputRef =
-    useRef<HTMLInputElement>(null);
+    useRef<HTMLInputElement | null>(null);
 
   async function loadAlbums() {
     try {
@@ -84,7 +85,10 @@ export default function AdminMemoriesPage() {
 
       setAlbums(data);
     } catch (err) {
-      console.error(err);
+      console.error(
+        "Load albums error:",
+        err
+      );
 
       setError(
         "Unable to load albums from Firebase."
@@ -95,38 +99,42 @@ export default function AdminMemoriesPage() {
   }
 
   useEffect(() => {
-  let cancelled = false;
+    let cancelled = false;
 
-  async function loadInitialAlbums() {
-    try {
-      setError("");
+    async function loadInitialAlbums() {
+      try {
+        setError("");
 
-      const data = await getFirestoreAlbums();
+        const data =
+          await getFirestoreAlbums();
 
-      if (!cancelled) {
-        setAlbums(data);
-      }
-    } catch (err) {
-      console.error(err);
-
-      if (!cancelled) {
-        setError(
-          "Unable to load albums from Firebase."
+        if (!cancelled) {
+          setAlbums(data);
+        }
+      } catch (err) {
+        console.error(
+          "Load albums error:",
+          err
         );
-      }
-    } finally {
-      if (!cancelled) {
-        setLoading(false);
+
+        if (!cancelled) {
+          setError(
+            "Unable to load albums from Firebase."
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     }
-  }
 
-  void loadInitialAlbums();
+    void loadInitialAlbums();
 
-  return () => {
-    cancelled = true;
-  };
-}, []);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function updateField(
     field: keyof typeof form,
@@ -139,7 +147,9 @@ export default function AdminMemoriesPage() {
   }
 
   function openEditor() {
-    setForm(EMPTY_FORM);
+    setForm({
+      ...EMPTY_FORM,
+    });
 
     setCoverFile(null);
     setCoverPreview("");
@@ -155,9 +165,23 @@ export default function AdminMemoriesPage() {
   function closeEditor() {
     if (saving) return;
 
+    if (coverPreview) {
+      URL.revokeObjectURL(
+        coverPreview
+      );
+    }
+
+    mediaFiles.forEach((media) => {
+      URL.revokeObjectURL(
+        media.previewUrl
+      );
+    });
+
     setShowEditor(false);
 
-    setForm(EMPTY_FORM);
+    setForm({
+      ...EMPTY_FORM,
+    });
 
     setCoverFile(null);
     setCoverPreview("");
@@ -187,21 +211,25 @@ export default function AdminMemoriesPage() {
 
     setError("");
 
-    setCoverFile(file);
+    if (coverPreview) {
+      URL.revokeObjectURL(
+        coverPreview
+      );
+    }
 
     const preview =
       URL.createObjectURL(file);
 
+    setCoverFile(file);
     setCoverPreview(preview);
   }
 
   function handleMediaChange(
     event: React.ChangeEvent<HTMLInputElement>
   ) {
-    const files =
-      Array.from(
-        event.target.files ?? []
-      );
+    const files = Array.from(
+      event.target.files ?? []
+    );
 
     if (!files.length) return;
 
@@ -216,7 +244,10 @@ export default function AdminMemoriesPage() {
         return validImage || validVideo;
       });
 
-    if (validFiles.length !== files.length) {
+    if (
+      validFiles.length !==
+      files.length
+    ) {
       setError(
         "Only image and video files can be added."
       );
@@ -262,275 +293,286 @@ export default function AdminMemoriesPage() {
   }
 
   async function handleCreateAlbum(
-  event: React.FormEvent
-) {
-  event.preventDefault();
+    event: React.FormEvent<HTMLFormElement>
+  ) {
+    event.preventDefault();
 
-  if (!form.title.trim()) {
-    setError("Please enter an album title.");
-    return;
-  }
-
-  if (!coverFile) {
-    setError("Please select a cover image.");
-    return;
-  }
-
-  try {
-    setSaving(true);
-    setError("");
-    setUploadStatus("Creating album...");
-
-    /*
-     * Create the album through the server API.
-     *
-     * The API:
-     * 1. Creates/gets the Evergreen/Memories folder
-     * 2. Creates the album folder in Google Drive
-     * 3. Creates the Firestore album document
-     * 4. Stores the Google Drive folder ID
-     */
-    const createResponse = await fetch(
-      "/api/memories/albums",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          title: form.title.trim(),
-          date: form.date,
-          location: form.location.trim(),
-          story: form.story.trim(),
-        }),
-      }
-    );
-
-    const createData = await createResponse.json();
-
-    if (!createResponse.ok) {
-      throw new Error(
-        createData.error ??
-          "Failed to create album."
+    if (!form.title.trim()) {
+      setError(
+        "Please enter an album title."
       );
+      return;
     }
 
-    const albumId =
-      createData.album?.id;
-
-    if (
-      typeof albumId !== "string" ||
-      !albumId
-    ) {
-      throw new Error(
-        "Album was created but no album ID was returned."
+    if (!coverFile) {
+      setError(
+        "Please select a cover image."
       );
+      return;
     }
 
-    /*
-     * Upload the cover image to Google Drive.
-     */
-    setUploadStatus(
-      "Uploading cover image..."
-    );
-
-    const coverFormData = new FormData();
-
-    coverFormData.append(
-      "file",
-      coverFile
-    );
-
-    coverFormData.append(
-      "type",
-      "cover"
-    );
-
-    const coverResponse = await fetch(
-      `/api/memories/albums/${albumId}/upload`,
-      {
-        method: "POST",
-        body: coverFormData,
-      }
-    );
-
-    const coverData =
-      await coverResponse.json();
-
-    if (!coverResponse.ok) {
-      throw new Error(
-        coverData.error ??
-          "Failed to upload cover image."
-      );
-    }
-
-    /*
-     * Upload all selected album media.
-     */
-    for (
-      let index = 0;
-      index < mediaFiles.length;
-      index++
-    ) {
-      const media =
-        mediaFiles[index];
-
+    try {
+      setSaving(true);
+      setError("");
       setUploadStatus(
-        `Uploading media ${index + 1} of ${mediaFiles.length}...`
+        "Creating album..."
       );
 
-      const mediaFormData =
+      /*
+       * Create the album through the
+       * server API.
+       */
+      const createResponse =
+        await fetch(
+          "/api/memories/albums",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+            body: JSON.stringify({
+              title:
+                form.title.trim(),
+              date: form.date,
+              location:
+                form.location.trim(),
+              story:
+                form.story.trim(),
+            }),
+          }
+        );
+
+      const createData =
+        await createResponse.json();
+
+      if (!createResponse.ok) {
+        throw new Error(
+          createData.error ??
+            "Failed to create album."
+        );
+      }
+
+      const albumId =
+        createData.album?.id;
+
+      if (
+        typeof albumId !==
+          "string" ||
+        !albumId
+      ) {
+        throw new Error(
+          "Album was created but no album ID was returned."
+        );
+      }
+
+      /*
+       * Upload the cover image.
+       */
+      setUploadStatus(
+        "Uploading cover image..."
+      );
+
+      const coverFormData =
         new FormData();
 
-      mediaFormData.append(
+      coverFormData.append(
         "file",
-        media.file
+        coverFile
       );
 
-      mediaFormData.append(
+      coverFormData.append(
         "type",
-        "media"
+        "cover"
       );
 
-      const mediaResponse =
+      const coverResponse =
         await fetch(
           `/api/memories/albums/${albumId}/upload`,
           {
             method: "POST",
-            body: mediaFormData,
+            body: coverFormData,
           }
         );
 
-      const mediaData =
-        await mediaResponse.json();
+      const coverData =
+        await coverResponse.json();
 
-      if (!mediaResponse.ok) {
+      if (!coverResponse.ok) {
         throw new Error(
-          mediaData.error ??
-            `Failed to upload media ${index + 1}.`
+          coverData.error ??
+            "Failed to upload cover image."
         );
       }
-    }
 
-    /*
-     * Everything finished successfully.
-     */
-    setUploadStatus(
-      "Album created successfully."
-    );
+      /*
+       * Upload album media.
+       */
+      for (
+        let index = 0;
+        index < mediaFiles.length;
+        index++
+      ) {
+        const media =
+          mediaFiles[index];
 
-    await loadAlbums();
+        setUploadStatus(
+          `Uploading media ${index + 1} of ${mediaFiles.length}...`
+        );
 
-    /*
-     * Clean up local object URLs.
-     */
-    if (coverPreview) {
-      URL.revokeObjectURL(
-        coverPreview
+        const mediaFormData =
+          new FormData();
+
+        mediaFormData.append(
+          "file",
+          media.file
+        );
+
+        mediaFormData.append(
+          "type",
+          "media"
+        );
+
+        const mediaResponse =
+          await fetch(
+            `/api/memories/albums/${albumId}/upload`,
+            {
+              method: "POST",
+              body: mediaFormData,
+            }
+          );
+
+        const mediaData =
+          await mediaResponse.json();
+
+        if (!mediaResponse.ok) {
+          throw new Error(
+            mediaData.error ??
+              `Failed to upload media ${index + 1}.`
+          );
+        }
+      }
+
+      /*
+       * Everything finished.
+       */
+      setUploadStatus(
+        "Album created successfully."
       );
-    }
 
-    mediaFiles.forEach((media) => {
-      URL.revokeObjectURL(
-        media.previewUrl
+      await loadAlbums();
+
+      /*
+       * Clean up local preview URLs.
+       */
+      if (coverPreview) {
+        URL.revokeObjectURL(
+          coverPreview
+        );
+      }
+
+      mediaFiles.forEach((media) => {
+        URL.revokeObjectURL(
+          media.previewUrl
+        );
+      });
+
+      setForm({
+        ...EMPTY_FORM,
+      });
+
+      setCoverFile(null);
+      setCoverPreview("");
+      setMediaFiles([]);
+
+      setTimeout(() => {
+        setShowEditor(false);
+        setUploadStatus("");
+      }, 700);
+    } catch (err) {
+      console.error(
+        "Create album error:",
+        err
       );
-    });
 
-    /*
-     * Reset the editor.
-     */
-    setForm(EMPTY_FORM);
-    setCoverFile(null);
-    setCoverPreview("");
-    setMediaFiles([]);
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to create the album."
+      );
 
-    /*
-     * Give the user a brief success state
-     * before closing the editor.
-     */
-    setTimeout(() => {
-      setShowEditor(false);
       setUploadStatus("");
-    }, 700);
-  } catch (err) {
-    console.error(
-      "Create album error:",
-      err
-    );
-
-    setError(
-      err instanceof Error
-        ? err.message
-        : "Unable to create the album."
-    );
-
-    setUploadStatus("");
-  } finally {
-    setSaving(false);
+    } finally {
+      setSaving(false);
+    }
   }
-}
 
   async function handleDeleteAlbum(
-  album: FirestoreAlbum
-) {
-  const confirmed = window.confirm(
-    `Delete "${album.title}"?\n\nThis will permanently remove the album from the CMS and delete its Google Drive folder and files.`
-  );
-
-  if (!confirmed) return;
-
-  try {
-    setError("");
-    setUploadStatus(
-      `Deleting "${album.title}"...`
-    );
-
-    const response = await fetch(
-      `/api/memories/albums/${album.id}`,
-      {
-        method: "DELETE",
-      }
-    );
-
-    const data =
-      await response.json();
-
-    if (!response.ok) {
-      throw new Error(
-        data.error ??
-          "Failed to delete album."
+    album: FirestoreAlbum
+  ) {
+    const confirmed =
+      window.confirm(
+        `Delete "${album.title}"?\n\nThis will permanently remove the album from the CMS and delete its Google Drive folder and files.`
       );
+
+    if (!confirmed) {
+      return;
     }
 
-    setAlbums((current) =>
-      current.filter(
-        (item) =>
-          item.id !== album.id
-      )
-    );
+    try {
+      setError("");
 
-    setUploadStatus(
-      "Album deleted successfully."
-    );
+      setUploadStatus(
+        `Deleting "${album.title}"...`
+      );
 
-    setTimeout(() => {
+      const response =
+        await fetch(
+          `/api/memories/albums/${album.id}`,
+          {
+            method: "DELETE",
+          }
+        );
+
+      const data =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ??
+            "Failed to delete album."
+        );
+      }
+
+      setAlbums((current) =>
+        current.filter(
+          (item) =>
+            item.id !== album.id
+        )
+      );
+
+      setUploadStatus(
+        "Album deleted successfully."
+      );
+
+      setTimeout(() => {
+        setUploadStatus("");
+      }, 1500);
+    } catch (err) {
+      console.error(
+        "Delete album error:",
+        err
+      );
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to delete the album."
+      );
+
       setUploadStatus("");
-    }, 1500);
-  } catch (err) {
-    console.error(
-      "Delete album error:",
-      err
-    );
-
-    setError(
-      err instanceof Error
-        ? err.message
-        : "Unable to delete the album."
-    );
-
-    setUploadStatus("");
+    }
   }
-}
 
   return (
     <main
@@ -643,6 +685,26 @@ export default function AdminMemoriesPage() {
           </div>
         )}
 
+        {/* GLOBAL STATUS */}
+
+        {!showEditor &&
+          uploadStatus && (
+            <div
+              style={{
+                marginBottom: 20,
+                padding: 14,
+                borderRadius: 14,
+                background:
+                  "#EFF4EF",
+                color: "#456C57",
+                fontSize: 14,
+                fontWeight: 600,
+              }}
+            >
+              {uploadStatus}
+            </div>
+          )}
+
         {/* ALBUM LIST */}
 
         {loading ? (
@@ -718,195 +780,234 @@ export default function AdminMemoriesPage() {
               <article
                 key={album.id}
                 style={{
-                  background: "white",
+                  background:
+                    "white",
                   borderRadius: 26,
                   overflow: "hidden",
                   boxShadow:
                     "0 18px 45px rgba(0,0,0,.06)",
                 }}
               >
-                {/* COVER */}
+                {/* CLICKABLE ALBUM AREA */}
 
-                <div
+                <Link
+                  href={`/admin/memories/${album.id}`}
                   style={{
-                    height: 210,
-                    background:
-                      "linear-gradient(135deg,#E7EFE8,#DDE8DE)",
-                    position:
-                      "relative",
-                    display: "flex",
-                    alignItems:
-                      "center",
-                    justifyContent:
-                      "center",
-                    overflow: "hidden",
+                    display: "block",
+                    color: "inherit",
+                    textDecoration:
+                      "none",
                   }}
                 >
-                  {album.coverFileId ? (
-  <img
-    src={`/api/memories/files/${album.coverFileId}`}
-    alt={album.title}
-    style={{
-      width: "100%",
-      height: "100%",
-      objectFit: "cover",
-    }}
-  />
-) : album.coverUrl ? (
-  <img
-    src={album.coverUrl}
-    alt={album.title}
-    style={{
-      width: "100%",
-      height: "100%",
-      objectFit: "cover",
-    }}
-  />
-) : (
-  <ImagePlus
-    size={48}
-    strokeWidth={1.5}
-    color="#456C57"
-  />
-)}
-                </div>
-
-                {/* INFO */}
-
-                <div
-                  style={{
-                    padding: 22,
-                  }}
-                >
-                  <h2
-                    style={{
-                      margin: 0,
-                      fontSize: 23,
-                      color: "#456C57",
-                      fontFamily:
-                        "var(--font-serif)",
-                    }}
-                  >
-                    {album.title}
-                  </h2>
+                  {/* COVER */}
 
                   <div
                     style={{
-                      marginTop: 12,
+                      height: 210,
+                      background:
+                        "linear-gradient(135deg,#E7EFE8,#DDE8DE)",
+                      position:
+                        "relative",
                       display: "flex",
-                      flexDirection:
-                        "column",
-                      gap: 7,
-                      color:
-                        "#7A887C",
-                      fontSize: 14,
+                      alignItems:
+                        "center",
+                      justifyContent:
+                        "center",
+                      overflow:
+                        "hidden",
                     }}
                   >
-                    {album.date && (
-                      <div
+                    {album.coverFileId ? (
+                      <img
+                        src={`/api/memories/files/${album.coverFileId}`}
+                        alt={
+                          album.title
+                        }
                         style={{
-                          display:
-                            "flex",
-                          alignItems:
-                            "center",
-                          gap: 7,
+                          width: "100%",
+                          height: "100%",
+                          objectFit:
+                            "cover",
                         }}
-                      >
-                        <CalendarDays
-                          size={15}
-                        />
-
-                        {album.date}
-                      </div>
-                    )}
-
-                    {album.location && (
-                      <div
+                      />
+                    ) : album.coverUrl ? (
+                      <img
+                        src={
+                          album.coverUrl
+                        }
+                        alt={
+                          album.title
+                        }
                         style={{
-                          display:
-                            "flex",
-                          alignItems:
-                            "center",
-                          gap: 7,
+                          width: "100%",
+                          height: "100%",
+                          objectFit:
+                            "cover",
                         }}
-                      >
-                        <MapPin
-                          size={15}
-                        />
-
-                        {album.location}
-                      </div>
+                      />
+                    ) : (
+                      <ImagePlus
+                        size={48}
+                        strokeWidth={
+                          1.5
+                        }
+                        color="#456C57"
+                      />
                     )}
                   </div>
 
-                  {album.story && (
-                    <p
-                      style={{
-                        marginTop: 16,
-                        marginBottom: 0,
-                        color: "#68746B",
-                        lineHeight: 1.6,
-                        display:
-                          "-webkit-box",
-                        WebkitLineClamp: 3,
-                        WebkitBoxOrient:
-                          "vertical",
-                        overflow: "hidden",
-                      }}
-                    >
-                      {album.story}
-                    </p>
-                  )}
+                  {/* INFO */}
 
                   <div
                     style={{
-                      display: "flex",
-                      justifyContent:
-                        "flex-end",
-                      marginTop: 20,
+                      padding: 22,
                     }}
                   >
-                    <button
-                      type="button"
-                      onClick={() =>
-                        handleDeleteAlbum(
-                          album
-                        )
-                      }
+                    <h2
                       style={{
-                        border:
-                          "1px solid rgba(170,50,50,.15)",
-                        background:
-                          "#FFF7F7",
+                        margin: 0,
+                        fontSize: 23,
                         color:
-                          "#A33A3A",
-                        borderRadius: 14,
-                        padding:
-                          "10px 14px",
+                          "#456C57",
+                        fontFamily:
+                          "var(--font-serif)",
+                      }}
+                    >
+                      {album.title}
+                    </h2>
+
+                    <div
+                      style={{
+                        marginTop: 12,
                         display:
                           "flex",
-                        alignItems:
-                          "center",
+                        flexDirection:
+                          "column",
                         gap: 7,
-                        cursor:
-                          "pointer",
-                        fontWeight: 600,
+                        color:
+                          "#7A887C",
+                        fontSize: 14,
                       }}
                     >
-                      <Trash2
-                        size={16}
-                      />
+                      {album.date && (
+                        <div
+                          style={{
+                            display:
+                              "flex",
+                            alignItems:
+                              "center",
+                            gap: 7,
+                          }}
+                        >
+                          <CalendarDays
+                            size={
+                              15
+                            }
+                          />
 
-                      Delete
-                    </button>
+                          {album.date}
+                        </div>
+                      )}
+
+                      {album.location && (
+                        <div
+                          style={{
+                            display:
+                              "flex",
+                            alignItems:
+                              "center",
+                            gap: 7,
+                          }}
+                        >
+                          <MapPin
+                            size={
+                              15
+                            }
+                          />
+
+                          {
+                            album.location
+                          }
+                        </div>
+                      )}
+                    </div>
+
+                    {album.story && (
+                      <p
+                        style={{
+                          marginTop: 16,
+                          marginBottom: 0,
+                          color:
+                            "#68746B",
+                          lineHeight:
+                            1.6,
+                          display:
+                            "-webkit-box",
+                          WebkitLineClamp: 3,
+                          WebkitBoxOrient:
+                            "vertical",
+                          overflow:
+                            "hidden",
+                        }}
+                      >
+                        {album.story}
+                      </p>
+                    )}
                   </div>
+                </Link>
+
+                {/* DELETE */}
+
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent:
+                      "flex-end",
+                    padding:
+                      "0 22px 22px",
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleDeleteAlbum(
+                        album
+                      )
+                    }
+                    style={{
+                      border:
+                        "1px solid rgba(170,50,50,.15)",
+                      background:
+                        "#FFF7F7",
+                      color:
+                        "#A33A3A",
+                      borderRadius:
+                        14,
+                      padding:
+                        "10px 14px",
+                      display:
+                        "flex",
+                      alignItems:
+                        "center",
+                      gap: 7,
+                      cursor:
+                        "pointer",
+                      fontWeight: 600,
+                    }}
+                  >
+                    <Trash2
+                      size={16}
+                    />
+
+                    Delete
+                  </button>
                 </div>
               </article>
             ))}
           </div>
         )}
 
-        {/* EDITOR */}
+        {/* NEW ALBUM EDITOR */}
 
         {showEditor && (
           <div
@@ -988,7 +1089,9 @@ export default function AdminMemoriesPage() {
 
                 <button
                   type="button"
-                  onClick={closeEditor}
+                  onClick={
+                    closeEditor
+                  }
                   disabled={saving}
                   style={{
                     width: 42,
@@ -1048,7 +1151,9 @@ export default function AdminMemoriesPage() {
                     value={
                       form.title
                     }
-                    onChange={(event) =>
+                    onChange={(
+                      event
+                    ) =>
                       updateField(
                         "title",
                         event.target
@@ -1056,7 +1161,9 @@ export default function AdminMemoriesPage() {
                       )
                     }
                     placeholder="e.g. Our First Trip"
-                    style={inputStyle}
+                    style={
+                      inputStyle
+                    }
                   />
                 </label>
 
@@ -1071,7 +1178,9 @@ export default function AdminMemoriesPage() {
                   }}
                 >
                   <span
-                    style={labelStyle}
+                    style={
+                      labelStyle
+                    }
                   >
                     Date
                   </span>
@@ -1081,14 +1190,18 @@ export default function AdminMemoriesPage() {
                     value={
                       form.date
                     }
-                    onChange={(event) =>
+                    onChange={(
+                      event
+                    ) =>
                       updateField(
                         "date",
                         event.target
                           .value
                       )
                     }
-                    style={inputStyle}
+                    style={
+                      inputStyle
+                    }
                   />
                 </label>
 
@@ -1103,7 +1216,9 @@ export default function AdminMemoriesPage() {
                   }}
                 >
                   <span
-                    style={labelStyle}
+                    style={
+                      labelStyle
+                    }
                   >
                     Location
                   </span>
@@ -1112,7 +1227,9 @@ export default function AdminMemoriesPage() {
                     value={
                       form.location
                     }
-                    onChange={(event) =>
+                    onChange={(
+                      event
+                    ) =>
                       updateField(
                         "location",
                         event.target
@@ -1120,7 +1237,9 @@ export default function AdminMemoriesPage() {
                       )
                     }
                     placeholder="e.g. Tagaytay"
-                    style={inputStyle}
+                    style={
+                      inputStyle
+                    }
                   />
                 </label>
 
@@ -1135,7 +1254,9 @@ export default function AdminMemoriesPage() {
                   }}
                 >
                   <span
-                    style={labelStyle}
+                    style={
+                      labelStyle
+                    }
                   >
                     Story
                   </span>
@@ -1144,7 +1265,9 @@ export default function AdminMemoriesPage() {
                     value={
                       form.story
                     }
-                    onChange={(event) =>
+                    onChange={(
+                      event
+                    ) =>
                       updateField(
                         "story",
                         event.target
@@ -1167,13 +1290,15 @@ export default function AdminMemoriesPage() {
 
                 <section
                   style={{
-                    marginBottom: 28,
+                    marginBottom:
+                      28,
                   }}
                 >
                   <div
                     style={{
                       ...labelStyle,
-                      marginBottom: 10,
+                      marginBottom:
+                        10,
                     }}
                   >
                     Cover Image *
@@ -1189,7 +1314,8 @@ export default function AdminMemoriesPage() {
                       handleCoverChange
                     }
                     style={{
-                      display: "none",
+                      display:
+                        "none",
                     }}
                   />
 
@@ -1199,7 +1325,8 @@ export default function AdminMemoriesPage() {
                         position:
                           "relative",
                         height: 240,
-                        borderRadius: 20,
+                        borderRadius:
+                          20,
                         overflow:
                           "hidden",
                         background:
@@ -1212,8 +1339,10 @@ export default function AdminMemoriesPage() {
                         }
                         alt="Cover preview"
                         style={{
-                          width: "100%",
-                          height: "100%",
+                          width:
+                            "100%",
+                          height:
+                            "100%",
                           objectFit:
                             "cover",
                         }}
@@ -1233,6 +1362,7 @@ export default function AdminMemoriesPage() {
                           setCoverFile(
                             null
                           );
+
                           setCoverPreview(
                             ""
                           );
@@ -1253,7 +1383,8 @@ export default function AdminMemoriesPage() {
                           height: 40,
                           borderRadius:
                             "50%",
-                          border: "none",
+                          border:
+                            "none",
                           background:
                             "rgba(255,255,255,.9)",
                           cursor:
@@ -1266,7 +1397,9 @@ export default function AdminMemoriesPage() {
                             "center",
                         }}
                       >
-                        <X size={18} />
+                        <X
+                          size={18}
+                        />
                       </button>
                     </div>
                   ) : (
@@ -1276,9 +1409,12 @@ export default function AdminMemoriesPage() {
                         coverInputRef.current?.click()
                       }
                       style={{
-                        width: "100%",
-                        minHeight: 170,
-                        borderRadius: 20,
+                        width:
+                          "100%",
+                        minHeight:
+                          170,
+                        borderRadius:
+                          20,
                         border:
                           "2px dashed rgba(69,108,87,.22)",
                         background:
@@ -1300,11 +1436,14 @@ export default function AdminMemoriesPage() {
                     >
                       <ImagePlus
                         size={34}
-                        strokeWidth={1.5}
+                        strokeWidth={
+                          1.5
+                        }
                       />
 
                       <strong>
-                        Choose Cover Image
+                        Choose Cover
+                        Image
                       </strong>
 
                       <span
@@ -1314,7 +1453,8 @@ export default function AdminMemoriesPage() {
                             "#7A887C",
                         }}
                       >
-                        JPG, PNG, WEBP
+                        JPG, PNG,
+                        WEBP
                       </span>
                     </button>
                   )}
@@ -1324,13 +1464,15 @@ export default function AdminMemoriesPage() {
 
                 <section
                   style={{
-                    marginBottom: 30,
+                    marginBottom:
+                      30,
                   }}
                 >
                   <div
                     style={{
                       ...labelStyle,
-                      marginBottom: 10,
+                      marginBottom:
+                        10,
                     }}
                   >
                     Album Media
@@ -1347,7 +1489,8 @@ export default function AdminMemoriesPage() {
                       handleMediaChange
                     }
                     style={{
-                      display: "none",
+                      display:
+                        "none",
                     }}
                   />
 
@@ -1357,9 +1500,12 @@ export default function AdminMemoriesPage() {
                       mediaInputRef.current?.click()
                     }
                     style={{
-                      width: "100%",
-                      minHeight: 120,
-                      borderRadius: 20,
+                      width:
+                        "100%",
+                      minHeight:
+                        120,
+                      borderRadius:
+                        20,
                       border:
                         "2px dashed rgba(69,108,87,.22)",
                       background:
@@ -1381,11 +1527,14 @@ export default function AdminMemoriesPage() {
                   >
                     <Upload
                       size={30}
-                      strokeWidth={1.5}
+                      strokeWidth={
+                        1.5
+                      }
                     />
 
                     <strong>
-                      Add Photos & Videos
+                      Add Photos &
+                      Videos
                     </strong>
 
                     <span
@@ -1395,8 +1544,8 @@ export default function AdminMemoriesPage() {
                           "#7A887C",
                       }}
                     >
-                      You can select multiple
-                      files
+                      You can select
+                      multiple files
                     </span>
                   </button>
 
@@ -1409,7 +1558,8 @@ export default function AdminMemoriesPage() {
                         gridTemplateColumns:
                           "repeat(auto-fill,minmax(120px,1fr))",
                         gap: 12,
-                        marginTop: 16,
+                        marginTop:
+                          16,
                       }}
                     >
                       {mediaFiles.map(
@@ -1553,9 +1703,11 @@ export default function AdminMemoriesPage() {
                 {uploadStatus && (
                   <div
                     style={{
-                      marginBottom: 18,
+                      marginBottom:
+                        18,
                       padding: 14,
-                      borderRadius: 14,
+                      borderRadius:
+                        14,
                       background:
                         "#EFF4EF",
                       color:
@@ -1564,7 +1716,9 @@ export default function AdminMemoriesPage() {
                       fontWeight: 600,
                     }}
                   >
-                    {uploadStatus}
+                    {
+                      uploadStatus
+                    }
                   </div>
                 )}
 
@@ -1572,7 +1726,8 @@ export default function AdminMemoriesPage() {
 
                 <div
                   style={{
-                    display: "flex",
+                    display:
+                      "flex",
                     justifyContent:
                       "flex-end",
                     gap: 12,
@@ -1580,7 +1735,9 @@ export default function AdminMemoriesPage() {
                 >
                   <button
                     type="button"
-                    onClick={closeEditor}
+                    onClick={
+                      closeEditor
+                    }
                     disabled={saving}
                     style={{
                       border:
@@ -1662,7 +1819,8 @@ const labelStyle = {
 
 const inputStyle = {
   width: "100%",
-  boxSizing: "border-box" as const,
+  boxSizing:
+    "border-box" as const,
   padding: "14px 16px",
   borderRadius: 15,
   border:

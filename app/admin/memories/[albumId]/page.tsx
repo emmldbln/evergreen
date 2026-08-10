@@ -1,10 +1,13 @@
 import { notFound, redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import Link from "next/link";
 
 import {
   getFirestoreAlbum,
   updateFirestoreAlbum,
 } from "@/lib/firestore/memories";
+
+import AlbumMediaManager from "./AlbumMediaManager";
 
 interface PageProps {
   params: Promise<{
@@ -12,7 +15,9 @@ interface PageProps {
   }>;
 }
 
-async function updateAlbum(formData: FormData) {
+async function updateAlbum(
+  formData: FormData
+) {
   "use server";
 
   const albumId =
@@ -21,31 +26,43 @@ async function updateAlbum(formData: FormData) {
       : "";
 
   if (!albumId) {
-    throw new Error("Album ID is required.");
+    throw new Error(
+      "Album ID is required."
+    );
   }
 
   const title =
     typeof formData.get("title") === "string"
-      ? String(formData.get("title")).trim()
+      ? String(
+          formData.get("title")
+        ).trim()
       : "";
 
   const date =
     typeof formData.get("date") === "string"
-      ? String(formData.get("date")).trim()
+      ? String(
+          formData.get("date")
+        ).trim()
       : "";
 
   const location =
     typeof formData.get("location") === "string"
-      ? String(formData.get("location")).trim()
+      ? String(
+          formData.get("location")
+        ).trim()
       : "";
 
   const story =
     typeof formData.get("story") === "string"
-      ? String(formData.get("story")).trim()
+      ? String(
+          formData.get("story")
+        ).trim()
       : "";
 
   if (!title) {
-    throw new Error("Album title is required.");
+    throw new Error(
+      "Album title is required."
+    );
   }
 
   await updateFirestoreAlbum(
@@ -60,6 +77,10 @@ async function updateAlbum(formData: FormData) {
 
   revalidatePath(
     `/admin/memories/${albumId}`
+  );
+
+  revalidatePath(
+    "/admin/memories"
   );
 
   redirect(
@@ -78,7 +99,9 @@ export default async function AlbumPage({
   }
 
   const album =
-    await getFirestoreAlbum(albumId);
+    await getFirestoreAlbum(
+      albumId
+    );
 
   if (!album) {
     notFound();
@@ -88,295 +111,323 @@ export default async function AlbumPage({
     album.mediaFiles ?? [];
 
   return (
-    <main className="min-h-screen bg-[#f4f8f4] px-6 py-12 text-[#365f4c]">
-      <div className="mx-auto max-w-6xl">
+    <main
+      style={{
+        minHeight: "100vh",
+        padding:
+          "32px 24px 145px",
+        background:
+          "linear-gradient(180deg,#F4F8F4 0%,#EEF4EF 100%)",
+      }}
+    >
+      <div
+        style={{
+          width: "100%",
+          maxWidth: 1000,
+          margin: "0 auto",
+        }}
+      >
+        {/* HEADER */}
 
-        {/* Header */}
-
-        <div className="mb-10 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+        <header
+          style={{
+            display: "flex",
+            justifyContent:
+              "space-between",
+            alignItems:
+              "center",
+            gap: 20,
+            marginBottom: 28,
+          }}
+        >
           <div>
-            <p className="mb-2 text-xs font-medium uppercase tracking-[0.25em] text-[#6d8b7c]">
+            <div
+              style={{
+                color: "#456C57",
+                fontSize: 12,
+                fontWeight: 700,
+                letterSpacing: 1.4,
+                textTransform:
+                  "uppercase",
+                marginBottom: 6,
+              }}
+            >
               Admin CMS
-            </p>
+            </div>
 
-            <h1 className="font-serif text-4xl font-semibold">
+            <h1
+              style={{
+                margin: 0,
+                color: "#456C57",
+                fontFamily:
+                  "var(--font-serif)",
+                fontSize:
+                  "clamp(32px, 5vw, 42px)",
+                lineHeight: 1.1,
+              }}
+            >
               {album.title}
             </h1>
 
-            <p className="mt-2 text-sm text-[#789287]">
-              Edit album details and manage its memories.
+            <p
+              style={{
+                margin:
+                  "7px 0 0",
+                color: "#7A887C",
+                fontSize: 14,
+              }}
+            >
+              Edit album details and
+              manage its memories.
             </p>
           </div>
 
-          <a
+          <Link
             href="/admin/memories"
-            className="inline-flex w-fit items-center rounded-full border border-[#d5e3db] bg-white px-5 py-3 text-sm font-medium text-[#4d735f] shadow-sm transition hover:bg-[#f8fbf9]"
+            style={{
+              flexShrink: 0,
+              textDecoration:
+                "none",
+              border:
+                "1px solid #D5E3DB",
+              borderRadius: 15,
+              background:
+                "#FFFFFF",
+              color: "#4D735F",
+              padding:
+                "11px 15px",
+              fontSize: 13,
+              fontWeight: 700,
+              boxShadow:
+                "0 7px 20px rgba(54,95,76,.05)",
+            }}
           >
-            ← Back to Memories
-          </a>
-        </div>
+            ← Back
+          </Link>
+        </header>
 
-        <div className="grid gap-8 lg:grid-cols-[1fr_1.25fr]">
+        {/* ================================================= */}
+        {/* ALBUM DETAILS */}
+        {/* ================================================= */}
 
-          {/* Album information */}
+        <section
+          style={{
+            background: "#FFFFFF",
+            border:
+              "1px solid #DCE8E1",
+            borderRadius: 24,
+            padding: 22,
+            boxShadow:
+              "0 16px 45px rgba(54,95,76,.07)",
+          }}
+        >
+          <div
+            style={{
+              marginBottom: 20,
+            }}
+          >
+            <h2
+              style={{
+                margin: 0,
+                color: "#365F4C",
+                fontFamily:
+                  "var(--font-serif)",
+                fontSize: 25,
+                fontWeight: 600,
+              }}
+            >
+              Album Details
+            </h2>
 
-          <section className="rounded-3xl border border-[#dce8e1] bg-white p-7 shadow-[0_20px_60px_rgba(54,95,76,0.08)]">
-            <div className="mb-6">
-              <h2 className="font-serif text-2xl font-semibold text-[#365f4c]">
-                Album Details
-              </h2>
+            <p
+              style={{
+                margin:
+                  "6px 0 0",
+                color: "#82968D",
+                fontSize: 13,
+              }}
+            >
+              Update the information
+              shown for this album.
+            </p>
+          </div>
 
-              <p className="mt-1 text-sm text-[#82968d]">
-                Update the information shown for this album.
-              </p>
+          <form
+            action={updateAlbum}
+            style={{
+              display: "flex",
+              flexDirection:
+                "column",
+              gap: 17,
+            }}
+          >
+            <input
+              type="hidden"
+              name="albumId"
+              value={album.id}
+            />
+
+            <div>
+              <label
+                htmlFor="title"
+                style={labelStyle}
+              >
+                Title
+              </label>
+
+              <input
+                id="title"
+                name="title"
+                type="text"
+                defaultValue={
+                  album.title
+                }
+                required
+                style={inputStyle}
+              />
             </div>
 
-            <form
-              action={updateAlbum}
-              className="space-y-5"
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns:
+                  "repeat(2,minmax(0,1fr))",
+                gap: 15,
+              }}
             >
-              <input
-                type="hidden"
-                name="albumId"
-                value={album.id}
-              />
-
               <div>
                 <label
-                  htmlFor="title"
-                  className="mb-2 block text-sm font-medium text-[#4d735f]"
+                  htmlFor="date"
+                  style={labelStyle}
                 >
-                  Title
+                  Date
                 </label>
 
                 <input
-                  id="title"
-                  name="title"
+                  id="date"
+                  name="date"
                   type="text"
-                  defaultValue={album.title}
-                  required
-                  className="w-full rounded-2xl border border-[#dce8e1] bg-[#fbfdfb] px-4 py-3 text-sm text-[#365f4c] outline-none transition focus:border-[#6f967f] focus:ring-2 focus:ring-[#6f967f]/20"
+                  defaultValue={
+                    album.date
+                  }
+                  placeholder="e.g. May 18, 2026"
+                  style={inputStyle}
                 />
-              </div>
-
-              <div className="grid gap-5 sm:grid-cols-2">
-                <div>
-                  <label
-                    htmlFor="date"
-                    className="mb-2 block text-sm font-medium text-[#4d735f]"
-                  >
-                    Date
-                  </label>
-
-                  <input
-                    id="date"
-                    name="date"
-                    type="text"
-                    defaultValue={album.date}
-                    placeholder="e.g. May 18, 2026"
-                    className="w-full rounded-2xl border border-[#dce8e1] bg-[#fbfdfb] px-4 py-3 text-sm text-[#365f4c] outline-none transition focus:border-[#6f967f] focus:ring-2 focus:ring-[#6f967f]/20"
-                  />
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="location"
-                    className="mb-2 block text-sm font-medium text-[#4d735f]"
-                  >
-                    Location
-                  </label>
-
-                  <input
-                    id="location"
-                    name="location"
-                    type="text"
-                    defaultValue={album.location}
-                    placeholder="e.g. Tagaytay"
-                    className="w-full rounded-2xl border border-[#dce8e1] bg-[#fbfdfb] px-4 py-3 text-sm text-[#365f4c] outline-none transition focus:border-[#6f967f] focus:ring-2 focus:ring-[#6f967f]/20"
-                  />
-                </div>
               </div>
 
               <div>
                 <label
-                  htmlFor="story"
-                  className="mb-2 block text-sm font-medium text-[#4d735f]"
+                  htmlFor="location"
+                  style={labelStyle}
                 >
-                  Story
+                  Location
                 </label>
 
-                <textarea
-                  id="story"
-                  name="story"
-                  defaultValue={album.story}
-                  rows={7}
-                  placeholder="Write something about this memory..."
-                  className="w-full resize-y rounded-2xl border border-[#dce8e1] bg-[#fbfdfb] px-4 py-3 text-sm leading-6 text-[#365f4c] outline-none transition focus:border-[#6f967f] focus:ring-2 focus:ring-[#6f967f]/20"
+                <input
+                  id="location"
+                  name="location"
+                  type="text"
+                  defaultValue={
+                    album.location
+                  }
+                  placeholder="e.g. Tagaytay"
+                  style={inputStyle}
                 />
               </div>
-
-              <button
-                type="submit"
-                className="w-full rounded-2xl bg-[#47745f] px-5 py-3.5 text-sm font-medium text-white shadow-sm transition hover:bg-[#3d6653]"
-              >
-                Save Changes
-              </button>
-            </form>
-          </section>
-
-          {/* Cover */}
-
-          <section className="rounded-3xl border border-[#dce8e1] bg-white p-7 shadow-[0_20px_60px_rgba(54,95,76,0.08)]">
-            <div className="mb-6">
-              <h2 className="font-serif text-2xl font-semibold text-[#365f4c]">
-                Album Cover
-              </h2>
-
-              <p className="mt-1 text-sm text-[#82968d]">
-                The current cover image for this album.
-              </p>
             </div>
 
-            <div className="overflow-hidden rounded-2xl bg-[#eef4ef]">
-              {album.coverFileId ? (
-                <img
-                  src={`/api/memories/files/${encodeURIComponent(
-                    album.coverFileId
-                  )}`}
-                  alt={album.title}
-                  className="aspect-video w-full object-cover"
-                />
-              ) : album.coverUrl ? (
-                <img
-                  src={album.coverUrl}
-                  alt={album.title}
-                  className="aspect-video w-full object-cover"
-                />
-              ) : (
-                <div className="flex aspect-video items-center justify-center text-sm text-[#82968d]">
-                  No cover image
-                </div>
-              )}
-            </div>
-
-            <div className="mt-5 rounded-2xl bg-[#f5f9f6] p-4 text-sm text-[#6d8479]">
-              <p className="font-medium text-[#4d735f]">
-                Cover management
-              </p>
-
-              <p className="mt-1">
-                Cover upload and replacement will be added to the CMS media workflow.
-              </p>
-            </div>
-          </section>
-        </div>
-
-        {/* Media */}
-
-        <section className="mt-8 rounded-3xl border border-[#dce8e1] bg-white p-7 shadow-[0_20px_60px_rgba(54,95,76,0.08)]">
-          <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <h2 className="font-serif text-2xl font-semibold text-[#365f4c]">
-                Memories
-              </h2>
+              <label
+                htmlFor="story"
+                style={labelStyle}
+              >
+                Story
+              </label>
 
-              <p className="mt-1 text-sm text-[#82968d]">
-                {mediaFiles.length}{" "}
-                {mediaFiles.length === 1
-                  ? "file"
-                  : "files"}{" "}
-                in this album.
-              </p>
+              <textarea
+                id="story"
+                name="story"
+                defaultValue={
+                  album.story
+                }
+                rows={6}
+                placeholder="Write something about this memory..."
+                style={{
+                  ...inputStyle,
+                  minHeight: 140,
+                  resize: "vertical",
+                  lineHeight: 1.6,
+                  fontFamily:
+                    "inherit",
+                }}
+              />
             </div>
 
             <button
-              type="button"
-              disabled
-              className="cursor-not-allowed rounded-full border border-[#dce8e1] bg-[#f5f8f6] px-5 py-2.5 text-sm text-[#9aaca3]"
+              type="submit"
+              style={{
+                border: "none",
+                borderRadius: 14,
+                background:
+                  "#47745F",
+                color: "#FFFFFF",
+                padding:
+                  "12px 18px",
+                fontSize: 14,
+                fontWeight: 700,
+                cursor:
+                  "pointer",
+              }}
             >
-              + Add Media
+              Save Changes
             </button>
-          </div>
-
-          {mediaFiles.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-[#d5e3db] bg-[#fafcfb] px-6 py-16 text-center">
-              <p className="font-serif text-xl text-[#5f7c6d]">
-                No memories yet
-              </p>
-
-              <p className="mt-2 text-sm text-[#91a39a]">
-                Media upload will be connected next.
-              </p>
-            </div>
-          ) : (
-            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {mediaFiles.map((file) => {
-                const isVideo =
-                  file.mimeType.startsWith(
-                    "video/"
-                  );
-
-                return (
-                  <article
-                    key={file.id}
-                    className="overflow-hidden rounded-2xl border border-[#dce8e1] bg-[#fbfdfb]"
-                  >
-                    <div className="aspect-video overflow-hidden bg-[#edf3ef]">
-                      {isVideo ? (
-                        <video
-                          src={`/api/memories/files/${encodeURIComponent(
-                            file.id
-                          )}`}
-                          controls
-                          preload="metadata"
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <img
-                          src={`/api/memories/files/${encodeURIComponent(
-                            file.id
-                          )}`}
-                          alt={file.name}
-                          className="h-full w-full object-cover"
-                        />
-                      )}
-                    </div>
-
-                    <div className="p-4">
-                      <p className="truncate text-sm font-medium text-[#4d735f]">
-                        {file.name}
-                      </p>
-
-                      <p className="mt-1 text-xs text-[#8a9e94]">
-                        {file.mimeType}
-                      </p>
-
-                      <form
-                        action={`/api/memories/albums/${encodeURIComponent(
-                          album.id
-                        )}/media/${encodeURIComponent(
-                          file.id
-                        )}`}
-                        method="POST"
-                        className="mt-4"
-                      >
-                        <button
-                          type="submit"
-                          disabled
-                          className="w-full cursor-not-allowed rounded-xl border border-[#ead8d5] px-4 py-2 text-xs font-medium text-[#b18b85]"
-                        >
-                          Delete Media
-                        </button>
-                      </form>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          )}
+          </form>
         </section>
 
+        {/* ================================================= */}
+        {/* INTERACTIVE MEDIA */}
+        {/* ================================================= */}
+
+        <AlbumMediaManager
+          albumId={album.id}
+          coverFileId={
+            album.coverFileId
+          }
+          coverUrl={
+            album.coverUrl
+          }
+          albumTitle={
+            album.title
+          }
+          mediaFiles={
+            mediaFiles
+          }
+        />
       </div>
     </main>
   );
 }
+
+const labelStyle = {
+  display: "block",
+  marginBottom: 7,
+  color: "#4D735F",
+  fontSize: 13,
+  fontWeight: 700,
+};
+
+const inputStyle = {
+  width: "100%",
+  boxSizing:
+    "border-box" as const,
+  padding:
+    "12px 14px",
+  border:
+    "1px solid #DCE8E1",
+  borderRadius: 14,
+  background:
+    "#FBFDFB",
+  color: "#365F4C",
+  fontSize: 14,
+  outline: "none",
+};
