@@ -96,8 +96,38 @@ export default function AdminMemoriesPage() {
   }
 
   useEffect(() => {
-    void loadAlbums();
-  }, []);
+  let cancelled = false;
+
+  async function loadInitialAlbums() {
+    try {
+      setError("");
+
+      const data = await getFirestoreAlbums();
+
+      if (!cancelled) {
+        setAlbums(data);
+      }
+    } catch (err) {
+      console.error(err);
+
+      if (!cancelled) {
+        setError(
+          "Unable to load albums from Firebase."
+        );
+      }
+    } finally {
+      if (!cancelled) {
+        setLoading(false);
+      }
+    }
+  }
+
+  void loadInitialAlbums();
+
+  return () => {
+    cancelled = true;
+  };
+}, []);
 
   function updateField(
     field: keyof typeof form,

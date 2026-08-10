@@ -59,7 +59,8 @@ export async function POST(
     if (!(file instanceof File)) {
       return NextResponse.json(
         {
-          error: "No file was provided.",
+          error:
+            "No file was provided.",
         },
         {
           status: 400,
@@ -82,6 +83,10 @@ export async function POST(
       );
     }
 
+    /*
+     * Upload the physical file to
+     * Google Drive.
+     */
     const uploaded =
       await uploadFileToDrive(
         file,
@@ -94,28 +99,82 @@ export async function POST(
       );
     }
 
+    /*
+     * ============================
+     * COVER
+     * ============================
+     */
+
     if (type === "cover") {
       await updateFirestoreAlbum(
         albumId,
         {
           coverUrl:
-            uploaded.webViewLink ?? "",
+            uploaded.webViewLink ??
+            "",
+
           coverFileId:
             uploaded.id,
         }
       );
-    } else {
+    }
+
+    /*
+     * ============================
+     * MEDIA
+     * ============================
+     */
+
+    else {
+      const existingMedia =
+        album.media ?? [];
+
+      const existingFileIds =
+        album.mediaFileIds ?? [];
+
+      const existingMediaFiles =
+        album.mediaFiles ?? [];
+
       await updateFirestoreAlbum(
         albumId,
         {
+          /*
+           * Keep the existing field for
+           * backwards compatibility.
+           */
           media: [
-            ...(album.media ?? []),
+            ...existingMedia,
             uploaded.webViewLink ??
               uploaded.id,
           ],
+
+          /*
+           * Keep the simple ID list.
+           */
           mediaFileIds: [
-            ...(album.mediaFileIds ?? []),
+            ...existingFileIds,
             uploaded.id,
+          ],
+
+          /*
+           * New structured metadata.
+           *
+           * This is what the public album
+           * page will use to determine
+           * photo vs video.
+           */
+          mediaFiles: [
+            ...existingMediaFiles,
+            {
+              id: uploaded.id,
+              name:
+                uploaded.name ??
+                file.name,
+              mimeType:
+                uploaded.mimeType ??
+                file.type ??
+                "application/octet-stream",
+            },
           ],
         }
       );
@@ -124,11 +183,19 @@ export async function POST(
     return NextResponse.json(
       {
         success: true,
+
         file: {
           id: uploaded.id,
+
           name:
             uploaded.name ??
             file.name,
+
+          mimeType:
+            uploaded.mimeType ??
+            file.type ??
+            "application/octet-stream",
+
           webViewLink:
             uploaded.webViewLink ??
             null,

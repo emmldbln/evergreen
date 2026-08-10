@@ -1,9 +1,49 @@
 import AlbumGrid from "../components/memories/AlbumGrid";
-import { getAlbums } from "@/lib/memories";
 
+import {
+  getFirestoreAlbums,
+} from "@/lib/firestore/memories";
 
-export default function MemoriesPage() {
-  const albums = getAlbums();
+export default async function MemoriesPage() {
+  const firestoreAlbums =
+    await getFirestoreAlbums();
+
+  const albums = firestoreAlbums.map(
+    (album) => ({
+      id: album.id,
+      title: album.title,
+      date: album.date,
+      location: album.location,
+      story: album.story,
+
+      /*
+       * The public AlbumCard expects a
+       * cover URL.
+       *
+       * Google Drive files are retrieved
+       * through our Evergreen API route.
+       */
+      cover: album.coverFileId
+        ? `/api/memories/files/${encodeURIComponent(
+            album.coverFileId
+          )}`
+        : album.coverUrl,
+
+      /*
+       * AlbumCard only needs the number
+       * of memories for this page.
+       *
+       * The actual file URLs are built
+       * on the album page.
+       */
+      media:
+        album.mediaFileIds?.map(
+          (fileId) =>
+            `/api/memories/files/${encodeURIComponent(
+              fileId
+            )}`
+        ) ?? album.media ?? [],
+    }));
 
   return (
     <main
@@ -24,7 +64,8 @@ export default function MemoriesPage() {
       >
         <h1
           style={{
-            fontFamily: "var(--font-serif)",
+            fontFamily:
+              "var(--font-serif)",
             fontSize: 60,
             color: "#456C57",
             marginBottom: 14,
@@ -42,9 +83,11 @@ export default function MemoriesPage() {
             margin: "0 auto",
           }}
         >
-          Every photograph is a page from our story.
-          Every video is a moment we can relive.
-          Thank you for filling my life with memories worth keeping forever.
+          Every photograph is a page from
+          our story. Every video is a moment
+          we can relive. Thank you for filling
+          my life with memories worth keeping
+          forever.
         </p>
       </div>
 

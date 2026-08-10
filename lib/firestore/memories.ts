@@ -13,6 +13,12 @@ import {
 
 import { db } from "@/firebase/firestore";
 
+export interface MediaFile {
+  id: string;
+  name: string;
+  mimeType: string;
+}
+
 export interface FirestoreAlbum {
   id: string;
 
@@ -26,6 +32,14 @@ export interface FirestoreAlbum {
 
   media: string[];
   mediaFileIds?: string[];
+
+  /*
+   * New structured media metadata.
+   *
+   * This tells Evergreen exactly what
+   * each Google Drive file is.
+   */
+  mediaFiles?: MediaFile[];
 
   driveFolderId: string;
 

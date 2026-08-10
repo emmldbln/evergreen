@@ -68,8 +68,38 @@ export default function SongsAdminPage() {
   }
 
   useEffect(() => {
-    loadSongs();
-  }, []);
+  let cancelled = false;
+
+  async function loadInitialSongs() {
+    try {
+      setLoading(true);
+
+      const result = await getFirestoreSongs();
+
+      if (!cancelled) {
+        setSongs(result);
+      }
+    } catch (error) {
+      console.error(error);
+
+      if (!cancelled) {
+        setMessage(
+          "Could not load songs."
+        );
+      }
+    } finally {
+      if (!cancelled) {
+        setLoading(false);
+      }
+    }
+  }
+
+  void loadInitialSongs();
+
+  return () => {
+    cancelled = true;
+  };
+}, []);
 
   function updateField(
     field: keyof SongForm,
