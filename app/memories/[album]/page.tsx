@@ -20,26 +20,28 @@ interface Props {
   }>;
 }
 
-function getDriveFileUrl(
-  fileId: string
-) {
-  return `/api/memories/files/${encodeURIComponent(
-    fileId
-  )}`;
+interface GalleryPhoto {
+  id: string;
+  name: string;
+  url: string;
+}
+
+interface GalleryVideo {
+  id: string;
+  name: string;
+  url: string;
+}
+
+function getDriveFileUrl(fileId: string) {
+  return `/api/memories/files/${encodeURIComponent(fileId)}`;
 }
 
 export default async function AlbumPage({
   params,
 }: Props) {
-  const { album } =
-    await params;
+  const { album } = await params;
 
-  /*
-   * The URL now uses the Firestore
-   * album document ID.
-   */
-  const data =
-    await getFirestoreAlbum(album);
+  const data = await getFirestoreAlbum(album);
 
   if (!data) {
     notFound();
@@ -47,42 +49,80 @@ export default async function AlbumPage({
 
   /*
    * ============================
-   * MEDIA
+   * BUILD MEDIA LIST
    * ============================
+   *
+   * mediaFiles is the preferred source.
+   *
+   * mediaFileIds remains as a fallback
+   * for albums created before structured
+   * media metadata was added.
    */
 
-  const mediaFiles =
-    data.mediaFiles ?? [];
+  const mediaFiles = data.mediaFiles ?? [];
 
-  const photos =
+  /*
+   * Cover is stored separately in Firestore
+   * as coverFileId.
+   *
+   * We intentionally add it to the gallery
+   * so the cover is also part of the album.
+   */
+
+  const coverPhoto: GalleryPhoto[] =
+    data.coverFileId
+      ? [
+          {
+            id: data.coverFileId,
+            name: `${data.title} — Cover`,
+            url: getDriveFileUrl(
+              data.coverFileId
+            ),
+          },
+        ]
+      : [];
+
+  /*
+   * Convert structured Firestore media
+   * into the UI format.
+   */
+
+  const structuredPhotos: GalleryPhoto[] =
     mediaFiles
       .filter((file) =>
-        file.mimeType.startsWith(
-          "image/"
-        )
+        file.mimeType.startsWith("image/")
       )
       .map((file) => ({
         id: file.id,
         name: file.name,
-        url: getDriveFileUrl(
-          file.id
-        ),
+        url: getDriveFileUrl(file.id),
       }));
 
-  const videos =
+  const structuredVideos: GalleryVideo[] =
     mediaFiles
       .filter((file) =>
-        file.mimeType.startsWith(
-          "video/"
-        )
+        file.mimeType.startsWith("video/")
       )
       .map((file) => ({
         id: file.id,
         name: file.name,
-        url: getDriveFileUrl(
-          file.id
-        ),
+        url: getDriveFileUrl(file.id),
       }));
+
+  /*
+   * Prevent the cover from appearing twice
+   * if the cover was also uploaded as media.
+   */
+
+  const photos: GalleryPhoto[] = [
+    ...coverPhoto,
+    ...structuredPhotos.filter(
+      (photo) =>
+        photo.id !== data.coverFileId
+    ),
+  ];
+
+  const videos = structuredVideos;
 
   return (
     <main
@@ -90,13 +130,10 @@ export default async function AlbumPage({
         minHeight: "100vh",
         maxWidth: 1400,
         margin: "0 auto",
-        padding:
-          "40px 32px 140px",
+        padding: "40px 32px 140px",
       }}
     >
-      {/* ============================
-          BACK BUTTON
-          ============================ */}
+      {/* BACK BUTTON */}
 
       <div
         style={{
@@ -112,8 +149,7 @@ export default async function AlbumPage({
             display: "inline-flex",
             alignItems: "center",
             gap: 10,
-            padding:
-              "14px 22px",
+            padding: "14px 22px",
             borderRadius: 999,
             textDecoration: "none",
             color: "#456C57",
@@ -131,13 +167,12 @@ export default async function AlbumPage({
           }}
         >
           <ArrowLeft size={20} />
+
           Back to Memories
         </Link>
       </div>
 
-      {/* ============================
-          HEADER
-          ============================ */}
+      {/* HEADER */}
 
       <div
         style={{
@@ -157,25 +192,29 @@ export default async function AlbumPage({
           {data.title}
         </h1>
 
-        <p
-          style={{
-            color: "#7E887F",
-            fontSize: 18,
-          }}
-        >
-          {data.date}
-        </p>
+        {data.date && (
+          <p
+            style={{
+              color: "#7E887F",
+              fontSize: 18,
+            }}
+          >
+            {data.date}
+          </p>
+        )}
 
-        <p
-          style={{
-            color: "#7E887F",
-            marginTop: 4,
-            marginBottom: 22,
-            fontSize: 18,
-          }}
-        >
-          {data.location}
-        </p>
+        {data.location && (
+          <p
+            style={{
+              color: "#7E887F",
+              marginTop: 4,
+              marginBottom: 22,
+              fontSize: 18,
+            }}
+          >
+            {data.location}
+          </p>
+        )}
 
         {data.story && (
           <p
@@ -192,9 +231,7 @@ export default async function AlbumPage({
         )}
       </div>
 
-      {/* ============================
-          PHOTOS
-          ============================ */}
+      {/* PHOTOS */}
 
       {photos.length > 0 && (
         <>
@@ -232,18 +269,11 @@ export default async function AlbumPage({
             </span>
           </div>
 
-          <GalleryGrid
-            photos={photos.map(
-              (photo) =>
-                photo.url
-            )}
-          />
+          <GalleryGrid photos={photos} />
         </>
       )}
 
-      {/* ============================
-          VIDEOS
-          ============================ */}
+      {/* VIDEOS */}
 
       {videos.length > 0 && (
         <>
@@ -293,29 +323,24 @@ export default async function AlbumPage({
               gap: 28,
             }}
           >
-            {videos.map(
-              (video) => (
-                <VideoCard
-                  key={video.id}
-                  src={video.url}
-                />
-              )
-            )}
+            {videos.map((video) => (
+              <VideoCard
+                key={video.id}
+                src={video.url}
+              />
+            ))}
           </div>
         </>
       )}
 
-      {/* ============================
-          EMPTY ALBUM
-          ============================ */}
+      {/* EMPTY ALBUM */}
 
       {photos.length === 0 &&
         videos.length === 0 && (
           <div
             style={{
               textAlign: "center",
-              padding:
-                "80px 20px",
+              padding: "80px 20px",
               color: "#7A887C",
             }}
           >

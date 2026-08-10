@@ -5,45 +5,73 @@ import {
 } from "@/lib/firestore/memories";
 
 export default async function MemoriesPage() {
-  const firestoreAlbums =
-    await getFirestoreAlbums();
+  const firestoreAlbums = await getFirestoreAlbums();
 
-  const albums = firestoreAlbums.map(
-    (album) => ({
+  const albums = firestoreAlbums.map((album) => {
+    /*
+     * Google Drive media files.
+     *
+     * The cover is stored separately from mediaFileIds,
+     * so we include it in the public album media list
+     * for counting/display purposes.
+     *
+     * We use a Set so the cover is NOT counted twice if
+     * it is already present inside mediaFileIds.
+     */
+    const mediaFileIds = album.mediaFileIds ?? [];
+
+    const allMediaFileIds = album.coverFileId
+      ? Array.from(
+          new Set([
+            album.coverFileId,
+            ...mediaFileIds,
+          ])
+        )
+      : mediaFileIds;
+
+    const media =
+      allMediaFileIds.length > 0
+        ? allMediaFileIds.map(
+            (fileId) =>
+              `/api/memories/files/${encodeURIComponent(
+                fileId
+              )}`
+          )
+        : album.media ?? [];
+
+    /*
+     * Google Drive cover
+     */
+    const cover = album.coverFileId
+      ? `/api/memories/files/${encodeURIComponent(
+          album.coverFileId
+        )}`
+      : album.coverUrl ?? "";
+
+    return {
       id: album.id,
+
       title: album.title,
-      date: album.date,
-      location: album.location,
-      story: album.story,
+
+      date: album.date ?? "",
+
+      location:
+        album.location ?? "",
+
+      story:
+        album.story ?? "",
+
+      cover,
 
       /*
-       * The public AlbumCard expects a
-       * cover URL.
+       * Includes the cover in the total memory count.
        *
-       * Google Drive files are retrieved
-       * through our Evergreen API route.
+       * Example:
+       * 1 cover + 2 photos + 1 video = 4 Memories
        */
-      cover: album.coverFileId
-        ? `/api/memories/files/${encodeURIComponent(
-            album.coverFileId
-          )}`
-        : album.coverUrl,
-
-      /*
-       * AlbumCard only needs the number
-       * of memories for this page.
-       *
-       * The actual file URLs are built
-       * on the album page.
-       */
-      media:
-        album.mediaFileIds?.map(
-          (fileId) =>
-            `/api/memories/files/${encodeURIComponent(
-              fileId
-            )}`
-        ) ?? album.media ?? [],
-    }));
+      media,
+    };
+  });
 
   return (
     <main
@@ -54,8 +82,6 @@ export default async function MemoriesPage() {
         margin: "0 auto",
       }}
     >
-      {/* Header */}
-
       <div
         style={{
           textAlign: "center",
@@ -64,11 +90,11 @@ export default async function MemoriesPage() {
       >
         <h1
           style={{
-            fontFamily:
-              "var(--font-serif)",
-            fontSize: 60,
-            color: "#456C57",
+            margin: 0,
             marginBottom: 14,
+            fontFamily: "var(--font-serif)",
+            fontSize: "clamp(42px,5vw,60px)",
+            color: "#456C57",
           }}
         >
           Our Memories
@@ -76,11 +102,11 @@ export default async function MemoriesPage() {
 
         <p
           style={{
+            margin: "0 auto",
             color: "#748574",
-            fontSize: 20,
+            fontSize: "clamp(16px,2vw,20px)",
             lineHeight: 1.8,
             maxWidth: 720,
-            margin: "0 auto",
           }}
         >
           Every photograph is a page from
