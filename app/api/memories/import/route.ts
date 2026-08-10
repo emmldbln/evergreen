@@ -16,9 +16,9 @@ const FOLDER_MIME_TYPE =
 function isSupportedMedia(file: {
   mimeType?: string | null;
 }) {
-  return (
+  return Boolean(
     file.mimeType?.startsWith("image/") ||
-    file.mimeType?.startsWith("video/")
+      file.mimeType?.startsWith("video/")
   );
 }
 
@@ -39,8 +39,7 @@ export async function POST() {
         ].join(" and "),
         spaces: "drive",
         orderBy: "name_natural",
-        fields:
-          "files(id,name,mimeType,createdTime)",
+        fields: "files(id,name,mimeType,createdTime)",
         pageSize: 100,
       });
 
@@ -72,18 +71,16 @@ export async function POST() {
           ].join(" and "),
           spaces: "drive",
           orderBy: "name_natural",
-          fields:
-            "files(id,name,mimeType,createdTime)",
+          fields: "files(id,name,mimeType,createdTime)",
           pageSize: 1000,
         });
 
       const files =
-        (filesResponse.data.files ?? [])
-          .filter(
-            (file) =>
-              Boolean(file.id) &&
-              isSupportedMedia(file)
-          );
+        (filesResponse.data.files ?? []).filter(
+          (file) =>
+            Boolean(file.id) &&
+            isSupportedMedia(file)
+        );
 
       const cover = files.find(
         (file) =>
@@ -104,17 +101,13 @@ export async function POST() {
 
       const mediaFiles = media
         .filter(
-          (
-            file
-          ): file is typeof file & {
+          (file): file is typeof file & {
             id: string;
           } => typeof file.id === "string"
         )
         .map((file) => ({
           id: file.id,
-          name:
-            file.name ??
-            file.id,
+          name: file.name ?? file.id,
           mimeType:
             file.mimeType ??
             "application/octet-stream",
@@ -123,16 +116,14 @@ export async function POST() {
       const existingByFolder =
         firestoreAlbums.find(
           (album) =>
-            album.driveFolderId ===
-            folderId
+            album.driveFolderId === folderId
         );
 
       if (existingByFolder) {
         results.push({
           title,
           status: "skipped",
-          mediaCount:
-            mediaFileIds.length,
+          mediaCount: mediaFileIds.length,
         });
         continue;
       }
@@ -145,39 +136,42 @@ export async function POST() {
         );
 
       if (existingByTitle) {
+        const update: Parameters<
+          typeof updateFirestoreAlbum
+        >[1] = {
+          driveFolderId: folderId,
+          coverUrl: "",
+          media: mediaFileIds.map(
+            (id) =>
+              `/api/memories/files/${encodeURIComponent(id)}`
+          ),
+          mediaFileIds,
+          mediaFiles,
+        };
+
+        if (cover?.id) {
+          update.coverFileId = cover.id;
+        }
+
         await updateFirestoreAlbum(
           existingByTitle.id,
-          {
-            driveFolderId: folderId,
-            coverUrl: "",
-            coverFileId:
-              cover?.id ?? undefined,
-            media: mediaFileIds.map(
-              (id) =>
-                `/api/memories/files/${encodeURIComponent(id)}`
-            ),
-            mediaFileIds,
-            mediaFiles,
-          }
+          update
         );
 
         results.push({
           title,
           status: "linked",
-          mediaCount:
-            mediaFileIds.length,
+          mediaCount: mediaFileIds.length,
         });
         continue;
       }
 
-      await addFirestoreAlbum({
+      const albumData = {
         title,
         date: "",
         location: "",
         story: "",
         coverUrl: "",
-        coverFileId:
-          cover?.id ?? undefined,
         media: mediaFileIds.map(
           (id) =>
             `/api/memories/files/${encodeURIComponent(id)}`
@@ -185,13 +179,21 @@ export async function POST() {
         mediaFileIds,
         mediaFiles,
         driveFolderId: folderId,
-      });
+      };
+
+      if (cover?.id) {
+        await addFirestoreAlbum({
+          ...albumData,
+          coverFileId: cover.id,
+        });
+      } else {
+        await addFirestoreAlbum(albumData);
+      }
 
       results.push({
         title,
         status: "imported",
-        mediaCount:
-          mediaFileIds.length,
+        mediaCount: mediaFileIds.length,
       });
     }
 
