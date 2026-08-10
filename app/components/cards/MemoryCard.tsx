@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import GlassCard from "../ui/GlassCard";
 
 import type {
@@ -13,53 +13,63 @@ interface Props {
   memories: HomepageMemory[];
 }
 
-function shuffle<T>(array: T[]) {
-  const copy = [...array];
-
-  for (let i = copy.length - 1; i > 0; i--) {
-    const j = Math.floor(
-      Math.random() * (i + 1)
-    );
-
-    [copy[i], copy[j]] = [
-      copy[j],
-      copy[i],
-    ];
-  }
-
-  return copy;
-}
-
 export default function MemoryCard({
   memories,
 }: Props) {
-  const [shuffled, setShuffled] =
-  useState(memories);
-  
-
   const [index, setIndex] = useState(0);
 
+  /*
+   * Automatically move to the next memory
+   * every 6 seconds.
+   */
   useEffect(() => {
-    if (shuffled.length <= 1) return;
+    if (memories.length <= 1) {
+      return;
+    }
 
-    const timer = setInterval(() => {
+    const timer = window.setInterval(() => {
       setIndex((current) => {
-        if (current >= shuffled.length - 1)
+        if (current >= memories.length - 1) {
           return 0;
+        }
 
         return current + 1;
       });
     }, 6000);
 
-    return () => clearInterval(timer);
-  }, [shuffled]);
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [memories.length]);
 
-  if (!shuffled.length) return null;
+  if (memories.length === 0) {
+    return null;
+  }
 
-  const memory = shuffled[index];
+  /*
+   * Make sure the selected index can never point
+   * outside the current memories array.
+   *
+   * This avoids needing another effect just to
+   * synchronize state with props.
+   */
+  const safeIndex = Math.min(
+    index,
+    memories.length - 1
+  );
+
+  const memory = memories[safeIndex];
+
+  if (!memory) {
+    return null;
+  }
 
   return (
     <GlassCard>
+      {/* =========================
+          MEMORY IMAGE
+          ========================= */}
+
       <div
         style={{
           position: "relative",
@@ -69,13 +79,19 @@ export default function MemoryCard({
       >
         <img
           src={memory.image}
-          alt={memory.albumTitle}
+          alt={
+            memory.albumTitle || "Memory"
+          }
+          loading="lazy"
           style={{
             width: "100%",
             height: "100%",
             objectFit: "cover",
+            display: "block",
           }}
         />
+
+        {/* Image overlay */}
 
         <div
           style={{
@@ -83,32 +99,50 @@ export default function MemoryCard({
             inset: 0,
             background:
               "linear-gradient(to top, rgba(0,0,0,.70), rgba(0,0,0,.10), transparent)",
+            pointerEvents: "none",
           }}
         />
 
-        <div
-          style={{
-            position: "absolute",
-            top: 20,
-            right: 20,
+        {/* =========================
+            DATE
+            ========================= */}
 
-            padding: "8px 16px",
+        {memory.date && (
+          <div
+            style={{
+              position: "absolute",
+              top: 20,
+              right: 20,
 
-            borderRadius: 999,
+              padding: "8px 16px",
 
-            background:
-              "rgba(255,255,255,.20)",
+              borderRadius: 999,
 
-            backdropFilter:
-              "blur(16px)",
+              background:
+                "rgba(255,255,255,.20)",
 
-            color: "white",
+              backdropFilter:
+                "blur(16px)",
 
-            fontSize: 14,
-          }}
-        >
-          {memory.date}
-        </div>
+              WebkitBackdropFilter:
+                "blur(16px)",
+
+              color: "white",
+
+              fontSize: 14,
+              fontWeight: 500,
+
+              boxShadow:
+                "0 8px 24px rgba(0,0,0,.12)",
+            }}
+          >
+            {memory.date}
+          </div>
+        )}
+
+        {/* =========================
+            ALBUM TITLE
+            ========================= */}
 
         <div
           style={{
@@ -125,6 +159,10 @@ export default function MemoryCard({
               fontSize: 38,
               margin: 0,
               lineHeight: 1.15,
+              fontFamily:
+                "var(--font-serif)",
+              textShadow:
+                "0 3px 15px rgba(0,0,0,.35)",
             }}
           >
             {memory.albumTitle}
@@ -132,31 +170,40 @@ export default function MemoryCard({
         </div>
       </div>
 
+      {/* =========================
+          MEMORY INFORMATION
+          ========================= */}
+
       <div
         style={{
           padding: 24,
         }}
       >
-        <p
-          style={{
-            color: "#6D7A70",
-            lineHeight: 1.8,
-            fontSize: 17,
-            marginBottom: 10,
-          }}
-        >
-          {memory.story}
-        </p>
+        {memory.story && (
+          <p
+            style={{
+              color: "#6D7A70",
+              lineHeight: 1.8,
+              fontSize: 17,
+              marginTop: 0,
+              marginBottom: 10,
+            }}
+          >
+            {memory.story}
+          </p>
+        )}
 
-        <p
-          style={{
-            color: "#9AA69B",
-            fontSize: 15,
-            margin: 0,
-          }}
-        >
-          📍 {memory.location}
-        </p>
+        {memory.location && (
+          <p
+            style={{
+              color: "#9AA69B",
+              fontSize: 15,
+              margin: 0,
+            }}
+          >
+            📍 {memory.location}
+          </p>
+        )}
       </div>
     </GlassCard>
   );

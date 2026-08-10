@@ -14,6 +14,13 @@ type DriveFolder = {
   webViewLink?: string | null;
 };
 
+type DriveFile = {
+  id: string;
+  name?: string | null;
+  mimeType?: string | null;
+  webViewLink?: string | null;
+};
+
 async function findFolder(
   folderName: string,
   parentId?: string
@@ -83,13 +90,20 @@ async function createFolder(
 }
 
 export async function getGoogleDriveClient() {
-  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientId =
+    process.env.GOOGLE_CLIENT_ID;
+
   const clientSecret =
     process.env.GOOGLE_CLIENT_SECRET;
+
   const redirectUri =
     process.env.GOOGLE_REDIRECT_URI;
 
-  if (!clientId || !clientSecret || !redirectUri) {
+  if (
+    !clientId ||
+    !clientSecret ||
+    !redirectUri
+  ) {
     throw new Error(
       "Google OAuth environment variables are not configured."
     );
@@ -97,9 +111,10 @@ export async function getGoogleDriveClient() {
 
   const cookieStore = await cookies();
 
-  const refreshToken = cookieStore.get(
-    "google_drive_refresh_token"
-  )?.value;
+  const refreshToken =
+    cookieStore.get(
+      "google_drive_refresh_token"
+    )?.value;
 
   if (!refreshToken) {
     throw new Error(
@@ -107,11 +122,12 @@ export async function getGoogleDriveClient() {
     );
   }
 
-  const oauth2Client = new google.auth.OAuth2(
-    clientId,
-    clientSecret,
-    redirectUri
-  );
+  const oauth2Client =
+    new google.auth.OAuth2(
+      clientId,
+      clientSecret,
+      redirectUri
+    );
 
   oauth2Client.setCredentials({
     refresh_token: refreshToken,
@@ -124,9 +140,10 @@ export async function getGoogleDriveClient() {
 }
 
 export async function getOrCreateEvergreenFolder() {
-  const existingFolder = await findFolder(
-    EVERGREEN_FOLDER_NAME
-  );
+  const existingFolder =
+    await findFolder(
+      EVERGREEN_FOLDER_NAME
+    );
 
   if (existingFolder) {
     return {
@@ -135,13 +152,15 @@ export async function getOrCreateEvergreenFolder() {
         existingFolder.name ??
         EVERGREEN_FOLDER_NAME,
       webViewLink:
-        existingFolder.webViewLink ?? null,
+        existingFolder.webViewLink ??
+        null,
     };
   }
 
-  const createdFolder = await createFolder(
-    EVERGREEN_FOLDER_NAME
-  );
+  const createdFolder =
+    await createFolder(
+      EVERGREEN_FOLDER_NAME
+    );
 
   return {
     id: createdFolder.id,
@@ -149,7 +168,8 @@ export async function getOrCreateEvergreenFolder() {
       createdFolder.name ??
       EVERGREEN_FOLDER_NAME,
     webViewLink:
-      createdFolder.webViewLink ?? null,
+      createdFolder.webViewLink ??
+      null,
   };
 }
 
@@ -157,10 +177,11 @@ export async function getOrCreateMemoriesFolder() {
   const evergreenFolder =
     await getOrCreateEvergreenFolder();
 
-  const existingFolder = await findFolder(
-    MEMORIES_FOLDER_NAME,
-    evergreenFolder.id
-  );
+  const existingFolder =
+    await findFolder(
+      MEMORIES_FOLDER_NAME,
+      evergreenFolder.id
+    );
 
   if (existingFolder) {
     return {
@@ -169,15 +190,17 @@ export async function getOrCreateMemoriesFolder() {
         existingFolder.name ??
         MEMORIES_FOLDER_NAME,
       webViewLink:
-        existingFolder.webViewLink ?? null,
+        existingFolder.webViewLink ??
+        null,
       parentId: evergreenFolder.id,
     };
   }
 
-  const createdFolder = await createFolder(
-    MEMORIES_FOLDER_NAME,
-    evergreenFolder.id
-  );
+  const createdFolder =
+    await createFolder(
+      MEMORIES_FOLDER_NAME,
+      evergreenFolder.id
+    );
 
   return {
     id: createdFolder.id,
@@ -185,52 +208,65 @@ export async function getOrCreateMemoriesFolder() {
       createdFolder.name ??
       MEMORIES_FOLDER_NAME,
     webViewLink:
-      createdFolder.webViewLink ?? null,
+      createdFolder.webViewLink ??
+      null,
     parentId: evergreenFolder.id,
   };
-  
 }
+
 export async function getOrCreateAlbumFolder(
   albumName: string
 ) {
   const memoriesFolder =
     await getOrCreateMemoriesFolder();
 
-  const existingFolder = await findFolder(
-    albumName,
-    memoriesFolder.id
-  );
+  const existingFolder =
+    await findFolder(
+      albumName,
+      memoriesFolder.id
+    );
 
   if (existingFolder) {
     return {
       id: existingFolder.id,
       name:
-        existingFolder.name ?? albumName,
+        existingFolder.name ??
+        albumName,
       webViewLink:
-        existingFolder.webViewLink ?? null,
+        existingFolder.webViewLink ??
+        null,
       parentId: memoriesFolder.id,
     };
   }
 
-  const createdFolder = await createFolder(
-    albumName,
-    memoriesFolder.id
-  );
+  const createdFolder =
+    await createFolder(
+      albumName,
+      memoriesFolder.id
+    );
 
   return {
     id: createdFolder.id,
     name:
-      createdFolder.name ?? albumName,
+      createdFolder.name ??
+      albumName,
     webViewLink:
-      createdFolder.webViewLink ?? null,
+      createdFolder.webViewLink ??
+      null,
     parentId: memoriesFolder.id,
   };
 }
+
+/**
+ * Uploads a file into a specific
+ * Google Drive folder.
+ */
 export async function uploadFileToDrive(
   file: File,
   parentId: string
 ) {
-  const drive = await getGoogleDriveClient();
+  const drive =
+    await getGoogleDriveClient();
 
   const buffer = Buffer.from(
     await file.arrayBuffer()
@@ -242,11 +278,15 @@ export async function uploadFileToDrive(
         name: file.name,
         parents: [parentId],
       },
+
       media: {
         mimeType:
-          file.type || "application/octet-stream",
+          file.type ||
+          "application/octet-stream",
+
         body: Readable.from(buffer),
       },
+
       fields:
         "id,name,mimeType,webViewLink,webContentLink",
     });
@@ -259,14 +299,195 @@ export async function uploadFileToDrive(
 
   return {
     id: uploadedFile.data.id,
+
     name:
-      uploadedFile.data.name ?? file.name,
+      uploadedFile.data.name ??
+      file.name,
+
     mimeType:
       uploadedFile.data.mimeType ??
       file.type,
+
     webViewLink:
-      uploadedFile.data.webViewLink ?? null,
+      uploadedFile.data.webViewLink ??
+      null,
+
     webContentLink:
-      uploadedFile.data.webContentLink ?? null,
+      uploadedFile.data.webContentLink ??
+      null,
   };
+}
+
+/**
+ * Renames a Google Drive file or folder.
+ */
+export async function updateDriveFileName(
+  fileId: string,
+  name: string
+) {
+  const drive =
+    await getGoogleDriveClient();
+
+  const response =
+    await drive.files.update({
+      fileId,
+
+      requestBody: {
+        name,
+      },
+
+      fields:
+        "id,name,mimeType,webViewLink",
+    });
+
+  if (!response.data.id) {
+    throw new Error(
+      "Google Drive file could not be updated."
+    );
+  }
+
+  return {
+    id: response.data.id,
+
+    name:
+      response.data.name ??
+      name,
+
+    mimeType:
+      response.data.mimeType ??
+      null,
+
+    webViewLink:
+      response.data.webViewLink ??
+      null,
+  };
+}
+
+/**
+ * Permanently deletes a single
+ * Google Drive file or folder.
+ */
+export async function deleteDriveFile(
+  fileId: string
+) {
+  const drive =
+    await getGoogleDriveClient();
+
+  await drive.files.delete({
+    fileId,
+  });
+}
+
+/**
+ * Lists the direct children of a
+ * Google Drive folder.
+ */
+async function listDriveChildren(
+  folderId: string
+): Promise<DriveFile[]> {
+  const drive =
+    await getGoogleDriveClient();
+
+  const files: DriveFile[] = [];
+
+  let pageToken: string | undefined;
+
+  do {
+    const response =
+      await drive.files.list({
+        q: `'${folderId}' in parents and trashed = false`,
+
+        spaces: "drive",
+
+        fields:
+          "nextPageToken,files(id,name,mimeType,webViewLink)",
+
+        pageSize: 1000,
+
+        pageToken,
+      });
+
+    for (const file of
+      response.data.files ?? []) {
+      if (file.id) {
+        files.push({
+          id: file.id,
+          name: file.name,
+          mimeType:
+            file.mimeType,
+          webViewLink:
+            file.webViewLink,
+        });
+      }
+    }
+
+    pageToken =
+      response.data.nextPageToken ??
+      undefined;
+  } while (pageToken);
+
+  return files;
+}
+
+/**
+ * Recursively deletes a Google Drive
+ * folder and everything contained inside.
+ *
+ * This is intentionally separate from
+ * deleteDriveFile() because deleting a
+ * folder alone should not be relied upon
+ * to remove its descendants.
+ */
+export async function deleteDriveFolder(
+  folderId: string
+) {
+  const drive =
+    await getGoogleDriveClient();
+
+  /*
+   * Find every item directly inside
+   * this folder.
+   */
+  const response =
+    await drive.files.list({
+      q: `'${folderId}' in parents and trashed = false`,
+      spaces: "drive",
+      fields:
+        "files(id,name,mimeType)",
+      pageSize: 1000,
+    });
+
+  const children =
+    response.data.files ?? [];
+
+  /*
+   * Delete children first.
+   *
+   * This ensures that media files
+   * physically disappear from
+   * Google Drive.
+   */
+  for (const child of children) {
+    if (!child.id) continue;
+
+    if (
+      child.mimeType ===
+      FOLDER_MIME_TYPE
+    ) {
+      await deleteDriveFolder(
+        child.id
+      );
+    } else {
+      await drive.files.delete({
+        fileId: child.id,
+      });
+    }
+  }
+
+  /*
+   * Finally delete the folder itself.
+   */
+  await drive.files.delete({
+    fileId: folderId,
+  });
 }

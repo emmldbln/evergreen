@@ -25,8 +25,6 @@ export default function SoundtrackScreen() {
     currentSong,
     playing,
     queue,
-    play,
-    pause,
     togglePlayback,
     playSong,
     nextSong,
@@ -199,7 +197,6 @@ export default function SoundtrackScreen() {
           background: "white",
           borderRadius: 34,
           padding: 36,
-
           boxShadow:
             "0 20px 55px rgba(0,0,0,.08)",
         }}
@@ -217,11 +214,8 @@ export default function SoundtrackScreen() {
               width: 280,
               height: 280,
               position: "relative",
-
               borderRadius: 34,
-
               overflow: "hidden",
-
               boxShadow: song.glow
                 ? "0 0 90px rgba(255,215,120,.85)"
                 : "0 25px 55px rgba(0,0,0,.15)",
@@ -292,7 +286,6 @@ export default function SoundtrackScreen() {
                 height: "100%",
                 background: "#456C57",
                 borderRadius: 999,
-
                 transition:
                   "width .35s ease",
               }}
@@ -304,9 +297,7 @@ export default function SoundtrackScreen() {
               display: "flex",
               justifyContent:
                 "space-between",
-
               marginTop: 10,
-
               color: "#8C8C8C",
             }}
           >
@@ -325,14 +316,9 @@ export default function SoundtrackScreen() {
         <div
           style={{
             display: "flex",
-
-            justifyContent:
-              "center",
-
+            justifyContent: "center",
             alignItems: "center",
-
             gap: 36,
-
             marginTop: 36,
           }}
         >
@@ -343,11 +329,9 @@ export default function SoundtrackScreen() {
               border: "none",
               background: "transparent",
               cursor: "pointer",
-
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-
               color: "#456C57",
             }}
           >
@@ -365,26 +349,15 @@ export default function SoundtrackScreen() {
               width: 72,
               height: 72,
               borderRadius: "50%",
-
               border: "none",
-
               background: "#456C57",
-
               color: "white",
-
               display: "flex",
-
-              justifyContent:
-                "center",
-
-              alignItems:
-                "center",
-
+              justifyContent: "center",
+              alignItems: "center",
               cursor: "pointer",
-
               boxShadow:
                 "0 10px 25px rgba(69,108,87,.30)",
-
               transition:
                 "transform .2s ease",
             }}
@@ -403,11 +376,9 @@ export default function SoundtrackScreen() {
               border: "none",
               background: "transparent",
               cursor: "pointer",
-
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-
               color: "#456C57",
             }}
           >
@@ -420,12 +391,9 @@ export default function SoundtrackScreen() {
         <div
           style={{
             display: "grid",
-
             gridTemplateColumns:
               "1fr 1fr",
-
             gap: 16,
-
             marginTop: 36,
           }}
         >
@@ -433,18 +401,11 @@ export default function SoundtrackScreen() {
             onClick={handleSpotify}
             style={{
               border: "none",
-
               padding: 18,
-
               borderRadius: 20,
-
-              background:
-                "#456C57",
-
+              background: "#456C57",
               color: "white",
-
               fontWeight: 700,
-
               cursor: "pointer",
             }}
           >
@@ -455,22 +416,13 @@ export default function SoundtrackScreen() {
             style={{
               border:
                 "1px solid rgba(69,108,87,.18)",
-
               background: "white",
-
               borderRadius: 20,
-
               fontWeight: 700,
-
               cursor: "pointer",
-
               display: "flex",
-
-              justifyContent:
-                "center",
-
+              justifyContent: "center",
               alignItems: "center",
-
               gap: 10,
             }}
           >

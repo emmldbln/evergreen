@@ -1,21 +1,24 @@
 import { NextResponse } from "next/server";
 
 import {
-  uploadFileToDrive,
-} from "@/lib/google-drive";
-
-import {
   getFirestoreAlbum,
   updateFirestoreAlbum,
 } from "@/lib/firestore/memories";
 
+import {
+  uploadFileToDrive,
+  deleteDriveFile,
+} from "@/lib/google-drive";
+
+interface RouteContext {
+  params: Promise<{
+    albumId: string;
+  }>;
+}
+
 export async function POST(
   request: Request,
-  context: {
-    params: Promise<{
-      albumId: string;
-    }>;
-  }
+  context: RouteContext
 ) {
   try {
     const { albumId } =
@@ -39,7 +42,7 @@ export async function POST(
       return NextResponse.json(
         {
           error:
-            "This album does not have a Google Drive folder.",
+            "Album does not have a Google Drive folder.",
         },
         {
           status: 400,
@@ -60,7 +63,7 @@ export async function POST(
       return NextResponse.json(
         {
           error:
-            "No file was provided.",
+            "No valid file was provided.",
         },
         {
           status: 400,
@@ -75,7 +78,7 @@ export async function POST(
       return NextResponse.json(
         {
           error:
-            "Upload type must be cover or media.",
+            'Upload type must be either "cover" or "media".',
         },
         {
           status: 400,
@@ -84,122 +87,147 @@ export async function POST(
     }
 
     /*
-     * Upload the physical file to
-     * Google Drive.
+     * Cover uploads must be images.
      */
-    const uploaded =
+    if (
+      type === "cover" &&
+      !file.type.startsWith("image/")
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Album covers must be image files.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    /*
+     * Media uploads must be
+     * images or videos.
+     */
+    if (
+      type === "media" &&
+      !file.type.startsWith("image/") &&
+      !file.type.startsWith("video/")
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Album media must be an image or video.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    /*
+     * Upload physical file to the
+     * album's Google Drive folder.
+     */
+    const uploadedFile =
       await uploadFileToDrive(
         file,
         album.driveFolderId
       );
 
-    if (!uploaded.id) {
-      throw new Error(
-        "Google Drive upload completed but no file ID was returned."
-      );
-    }
-
-    /*
-     * ============================
-     * COVER
-     * ============================
-     */
-
     if (type === "cover") {
+      /*
+       * If an old cover exists,
+       * remove it from Drive.
+       *
+       * We intentionally do this AFTER
+       * the new file has uploaded so
+       * a failed upload doesn't destroy
+       * the existing cover.
+       */
+      if (
+        album.coverFileId &&
+        album.coverFileId !==
+          uploadedFile.id
+      ) {
+        try {
+          await deleteDriveFile(
+          album.coverFileId
+              );
+        } catch (error) {
+          console.error(
+            "Failed to delete previous cover:",
+            error
+          );
+        }
+      }
+
       await updateFirestoreAlbum(
         albumId,
         {
-          coverUrl:
-            uploaded.webViewLink ??
-            "",
-
           coverFileId:
-            uploaded.id,
+            uploadedFile.id,
+
+          coverUrl:
+            uploadedFile.webViewLink ??
+            "",
         }
       );
-    }
-
-    /*
-     * ============================
-     * MEDIA
-     * ============================
-     */
-
-    else {
-      const existingMedia =
-        album.media ?? [];
-
-      const existingFileIds =
+    } else {
+      /*
+       * Add the new media file.
+       */
+      const mediaFileIds =
         album.mediaFileIds ?? [];
 
-      const existingMediaFiles =
+      const mediaFiles =
         album.mediaFiles ?? [];
+
+      const media =
+        album.media ?? [];
 
       await updateFirestoreAlbum(
         albumId,
         {
-          /*
-           * Keep the existing field for
-           * backwards compatibility.
-           */
-          media: [
-            ...existingMedia,
-            uploaded.webViewLink ??
-              uploaded.id,
-          ],
-
-          /*
-           * Keep the simple ID list.
-           */
           mediaFileIds: [
-            ...existingFileIds,
-            uploaded.id,
+            ...mediaFileIds,
+            uploadedFile.id,
           ],
 
-          /*
-           * New structured metadata.
-           *
-           * This is what the public album
-           * page will use to determine
-           * photo vs video.
-           */
           mediaFiles: [
-            ...existingMediaFiles,
+            ...mediaFiles,
             {
-              id: uploaded.id,
-              name:
-                uploaded.name ??
-                file.name,
+              id: uploadedFile.id,
+              name: uploadedFile.name,
               mimeType:
-                uploaded.mimeType ??
-                file.type ??
-                "application/octet-stream",
+                uploadedFile.mimeType,
             },
+          ],
+
+          media: [
+            ...media,
+            uploadedFile.webViewLink ??
+              "",
           ],
         }
       );
     }
+
+    const updatedAlbum =
+      await getFirestoreAlbum(
+        albumId
+      );
 
     return NextResponse.json(
       {
         success: true,
-
+        type,
         file: {
-          id: uploaded.id,
-
-          name:
-            uploaded.name ??
-            file.name,
-
+          id: uploadedFile.id,
+          name: uploadedFile.name,
           mimeType:
-            uploaded.mimeType ??
-            file.type ??
-            "application/octet-stream",
-
-          webViewLink:
-            uploaded.webViewLink ??
-            null,
+            uploadedFile.mimeType,
         },
+        album: updatedAlbum,
       },
       {
         status: 200,
@@ -207,7 +235,7 @@ export async function POST(
     );
   } catch (error) {
     console.error(
-      "Google Drive upload error:",
+      "Upload memory file error:",
       error
     );
 
@@ -216,7 +244,7 @@ export async function POST(
         error:
           error instanceof Error
             ? error.message
-            : "Failed to upload file.",
+            : "Failed to upload memory file.",
       },
       {
         status: 500,

@@ -19,7 +19,6 @@ import {
 } from "lucide-react";
 
 import {
-  deleteFirestoreAlbum,
   getFirestoreAlbums,
   type FirestoreAlbum,
 } from "@/lib/firestore/memories";
@@ -472,36 +471,66 @@ export default function AdminMemoriesPage() {
 }
 
   async function handleDeleteAlbum(
-    album: FirestoreAlbum
-  ) {
-    const confirmed =
-      window.confirm(
-        `Delete "${album.title}"?`
-      );
+  album: FirestoreAlbum
+) {
+  const confirmed = window.confirm(
+    `Delete "${album.title}"?\n\nThis will permanently remove the album from the CMS and delete its Google Drive folder and files.`
+  );
 
-    if (!confirmed) return;
+  if (!confirmed) return;
 
-    try {
-      setError("");
+  try {
+    setError("");
+    setUploadStatus(
+      `Deleting "${album.title}"...`
+    );
 
-      await deleteFirestoreAlbum(
-        album.id
-      );
+    const response = await fetch(
+      `/api/memories/albums/${album.id}`,
+      {
+        method: "DELETE",
+      }
+    );
 
-      setAlbums((current) =>
-        current.filter(
-          (item) =>
-            item.id !== album.id
-        )
-      );
-    } catch (err) {
-      console.error(err);
+    const data =
+      await response.json();
 
-      setError(
-        "Unable to delete the album."
+    if (!response.ok) {
+      throw new Error(
+        data.error ??
+          "Failed to delete album."
       );
     }
+
+    setAlbums((current) =>
+      current.filter(
+        (item) =>
+          item.id !== album.id
+      )
+    );
+
+    setUploadStatus(
+      "Album deleted successfully."
+    );
+
+    setTimeout(() => {
+      setUploadStatus("");
+    }, 1500);
+  } catch (err) {
+    console.error(
+      "Delete album error:",
+      err
+    );
+
+    setError(
+      err instanceof Error
+        ? err.message
+        : "Unable to delete the album."
+    );
+
+    setUploadStatus("");
   }
+}
 
   return (
     <main
