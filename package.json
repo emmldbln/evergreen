@@ -3,11 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
-  },
+  "dev": "next dev",
+  "build": "next build",
+  "start": "next start",
+  "lint": "eslint",
+  "migrate:letters": "tsx scripts/migrate-letters.ts"
+},
   "dependencies": {
     "clsx": "^2.1.1",
     "firebase": "^12.17.1",

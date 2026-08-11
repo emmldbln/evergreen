@@ -1,94 +1,26 @@
-"use client";
+import {
+  getFirestoreLetters,
+} from "@/lib/firestore/letters";
 
-import { useState } from "react";
-import { AnimatePresence } from "framer-motion";
+import LetterPageClient from "./LetterPageClient";
 
-import Envelope from "../components/letter/Envelope";
-import LetterModal from "../components/letter/LetterModal";
-import { letters, Letter } from "../components/letter/letters";
+export default async function LetterPage() {
+  const firestoreLetters =
+    await getFirestoreLetters();
 
-export default function LetterPage() {
-  const [selectedLetter, setSelectedLetter] = useState<Letter | null>(null);
+  const letters =
+    firestoreLetters.map(
+      (letter) => ({
+        id: letter.id,
+        title: letter.title,
+        subtitle: letter.subtitle,
+        content: letter.content,
+      })
+    );
 
   return (
-    <>
-      <main
-        style={{
-          minHeight: "100vh",
-          padding: "70px 28px 120px",
-
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-        }}
-      >
-        {/* Title */}
-
-        <h1
-          style={{
-            fontFamily: "var(--font-serif)",
-            fontSize: 56,
-            fontWeight: 600,
-
-            color: "#456C57",
-
-            marginBottom: 8,
-          }}
-        >
-          My Letters
-        </h1>
-
-        <p
-          style={{
-            fontFamily: "var(--font-serif)",
-            fontSize: 20,
-
-            color: "#708173",
-
-            marginBottom: 55,
-
-            textAlign: "center",
-
-            maxWidth: 650,
-
-            lineHeight: 1.7,
-          }}
-        >
-          Some words are meant to be opened only when you need them most.
-        </p>
-
-        {/* Grid */}
-
-        <div
-          style={{
-            width: "100%",
-            maxWidth: 900,
-
-            display: "grid",
-
-           gridTemplateColumns: "repeat(3, minmax(0,1fr))",
-            columnGap: 42,
-            rowGap: 70,
-          }}
-        >
-          {letters.map((letter) => (
-            <Envelope
-              key={letter.id}
-              letter={letter}
-              onOpen={setSelectedLetter}
-            />
-          ))}
-        </div>
-      </main>
-
-      <AnimatePresence>
-        {selectedLetter && (
-          <LetterModal
-            letter={selectedLetter}
-            onClose={() => setSelectedLetter(null)}
-          />
-        )}
-      </AnimatePresence>
-    </>
+    <LetterPageClient
+      letters={letters}
+    />
   );
 }

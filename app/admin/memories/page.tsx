@@ -590,82 +590,107 @@ export default function AdminMemoriesPage() {
           margin: "0 auto",
         }}
       >
-        {/* HEADER */}
+      {/* HEADER */}
 
-        <header
-          style={{
-            display: "flex",
-            justifyContent:
-              "space-between",
-            alignItems: "center",
-            gap: 20,
-            marginBottom: 36,
-          }}
-        >
-          <div>
-            <div
-              style={{
-                color: "#456C57",
-                fontSize: 13,
-                fontWeight: 700,
-                letterSpacing: 1.5,
-                textTransform:
-                  "uppercase",
-                marginBottom: 8,
-              }}
-            >
-              Admin CMS
-            </div>
+<header
+  style={{
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 20,
+    marginBottom: 36,
+  }}
+>
+  <div>
+    <div
+      style={{
+        color: "#456C57",
+        fontSize: 13,
+        fontWeight: 700,
+        letterSpacing: 1.5,
+        textTransform: "uppercase",
+        marginBottom: 8,
+      }}
+    >
+      Admin CMS
+    </div>
 
-            <h1
-              style={{
-                margin: 0,
-                fontSize: 46,
-                color: "#456C57",
-                fontFamily:
-                  "var(--font-serif)",
-              }}
-            >
-              Memories
-            </h1>
+    <h1
+      style={{
+        margin: 0,
+        fontSize: 46,
+        color: "#456C57",
+        fontFamily: "var(--font-serif)",
+      }}
+    >
+      Memories
+    </h1>
 
-            <p
-              style={{
-                marginTop: 8,
-                color: "#7A887C",
-                fontSize: 16,
-              }}
-            >
-              Manage your albums and
-              memories.
-            </p>
-          </div>
+    <p
+      style={{
+        marginTop: 8,
+        color: "#7A887C",
+        fontSize: 16,
+      }}
+    >
+      Manage your albums and memories.
+    </p>
+  </div>
 
-          <button
-            type="button"
-            onClick={openEditor}
-            style={{
-              border: "none",
-              borderRadius: 18,
-              padding:
-                "14px 20px",
-              background:
-                "#456C57",
-              color: "white",
-              fontWeight: 700,
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              cursor: "pointer",
-              boxShadow:
-                "0 12px 28px rgba(69,108,87,.2)",
-            }}
-          >
-            <Plus size={18} />
+  {/* HEADER ACTIONS */}
 
-            New Album
-          </button>
-        </header>
+  <div
+    style={{
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      flexShrink: 0,
+    }}
+  >
+    <Link
+      href="/admin"
+      style={{
+        textDecoration: "none",
+        border: "1px solid #D5E3DB",
+        borderRadius: 14,
+        background: "#FFFFFF",
+        color: "#4D735F",
+        padding: "12px 15px",
+        fontSize: 13,
+        fontWeight: 700,
+        boxShadow:
+          "0 7px 20px rgba(54,95,76,.05)",
+        whiteSpace: "nowrap",
+      }}
+    >
+      ← Content Manager
+    </Link>
+
+    <button
+      type="button"
+      onClick={openEditor}
+      style={{
+        border: "none",
+        borderRadius: 18,
+        padding: "14px 20px",
+        background: "#456C57",
+        color: "white",
+        fontWeight: 700,
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        cursor: "pointer",
+        boxShadow:
+          "0 12px 28px rgba(69,108,87,.2)",
+        whiteSpace: "nowrap",
+      }}
+    >
+      <Plus size={18} />
+
+      New Album
+    </button>
+  </div>
+</header>
 
         {/* ERROR */}
 
