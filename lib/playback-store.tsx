@@ -260,8 +260,12 @@ export function PlaybackProvider({
   }, [nextSong, repeat]);
 
   useEffect(() => {
-    return () => audioRef.current?.pause();
-  }, []);
+  const audio = audioRef.current;
+
+  return () => {
+    audio?.pause();
+  };
+}, []);
 
   const value = useMemo(
     () => ({

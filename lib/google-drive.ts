@@ -377,58 +377,6 @@ export async function deleteDriveFile(
     fileId,
   });
 }
-
-/**
- * Lists the direct children of a
- * Google Drive folder.
- */
-async function listDriveChildren(
-  folderId: string
-): Promise<DriveFile[]> {
-  const drive =
-    await getGoogleDriveClient();
-
-  const files: DriveFile[] = [];
-
-  let pageToken: string | undefined;
-
-  do {
-    const response =
-      await drive.files.list({
-        q: `'${folderId}' in parents and trashed = false`,
-
-        spaces: "drive",
-
-        fields:
-          "nextPageToken,files(id,name,mimeType,webViewLink)",
-
-        pageSize: 1000,
-
-        pageToken,
-      });
-
-    for (const file of
-      response.data.files ?? []) {
-      if (file.id) {
-        files.push({
-          id: file.id,
-          name: file.name,
-          mimeType:
-            file.mimeType,
-          webViewLink:
-            file.webViewLink,
-        });
-      }
-    }
-
-    pageToken =
-      response.data.nextPageToken ??
-      undefined;
-  } while (pageToken);
-
-  return files;
-}
-
 /**
  * Recursively deletes a Google Drive
  * folder and everything contained inside.

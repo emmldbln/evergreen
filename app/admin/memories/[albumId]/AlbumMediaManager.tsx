@@ -9,8 +9,7 @@ import {
   Film,
   ImagePlus,
   Trash2,
-  Upload,
-  X,
+  Upload
 } from "lucide-react";
 
 import { useRouter } from "next/navigation";

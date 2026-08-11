@@ -77,20 +77,6 @@ export default function MemoryCard({
           overflow: "hidden",
         }}
       >
-        <img
-          src={memory.image}
-          alt={
-            memory.albumTitle || "Memory"
-          }
-          loading="lazy"
-          style={{
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-            display: "block",
-          }}
-        />
-
         {/* Image overlay */}
 
         <div
