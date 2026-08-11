@@ -843,6 +843,8 @@ export default function AdminMemoriesPage() {
                     }}
                   >
                     {album.coverFileId ? (
+                      <>
+                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={`/api/memories/files/${album.coverFileId}`}
                         alt={
@@ -855,7 +857,10 @@ export default function AdminMemoriesPage() {
                             "cover",
                         }}
                       />
+                      </>
                     ) : album.coverUrl ? (
+                      <>
+                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={
                           album.coverUrl
@@ -870,6 +875,7 @@ export default function AdminMemoriesPage() {
                             "cover",
                         }}
                       />
+                      </>
                     ) : (
                       <ImagePlus
                         size={48}
@@ -1358,6 +1364,7 @@ export default function AdminMemoriesPage() {
                           "#EFF4EF",
                       }}
                     >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={
                           coverPreview
@@ -1629,6 +1636,8 @@ export default function AdminMemoriesPage() {
                                   }}
                                 />
                               ) : (
+                                <>
+                                 {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img
                                   src={
                                     media.previewUrl
@@ -1646,6 +1655,7 @@ export default function AdminMemoriesPage() {
                                       "cover",
                                   }}
                                 />
+                                </>
                               )}
 
                               {isVideo && (

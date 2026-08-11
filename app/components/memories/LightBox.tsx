@@ -451,6 +451,8 @@ export default function LightBox({
             support video playback.
           </video>
         ) : (
+          <>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             key={media.id}
             src={media.url}
@@ -482,6 +484,7 @@ export default function LightBox({
                 "0 25px 80px rgba(0,0,0,.45)",
             }}
           />
+          </>
         )}
       </div>
 

@@ -71,6 +71,8 @@ export default function AlbumCard({
           }}
         >
           {album.cover ? (
+            <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={album.cover}
               alt={album.title}
@@ -88,6 +90,7 @@ export default function AlbumCard({
                 objectPosition: "center",
               }}
             />
+            </>
           ) : (
             <div
               style={{

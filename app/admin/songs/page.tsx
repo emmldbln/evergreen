@@ -706,6 +706,8 @@ export default function SongsAdminPage() {
                     }}
                   >
                     {song.cover && (
+                      <>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={song.cover}
                         alt=""
@@ -716,6 +718,7 @@ export default function SongsAdminPage() {
                             "cover",
                         }}
                       />
+                      </>
                     )}
                   </div>
 

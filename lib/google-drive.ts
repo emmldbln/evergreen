@@ -14,13 +14,6 @@ type DriveFolder = {
   webViewLink?: string | null;
 };
 
-type DriveFile = {
-  id: string;
-  name?: string | null;
-  mimeType?: string | null;
-  webViewLink?: string | null;
-};
-
 async function findFolder(
   folderName: string,
   parentId?: string

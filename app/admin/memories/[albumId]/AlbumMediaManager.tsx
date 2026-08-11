@@ -395,6 +395,8 @@ export default function AlbumMediaManager({
           }}
         >
           {coverFileId ? (
+            <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={`/api/memories/files/${encodeURIComponent(
                 coverFileId
@@ -407,7 +409,10 @@ export default function AlbumMediaManager({
                 objectFit: "cover",
               }}
             />
+            </>
           ) : coverUrl ? (
+            <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={coverUrl}
               alt={albumTitle}
@@ -418,6 +423,7 @@ export default function AlbumMediaManager({
                 objectFit: "cover",
               }}
             />
+            </>
           ) : (
             <div
               style={{
@@ -717,6 +723,8 @@ export default function AlbumMediaManager({
                           }}
                         />
                       ) : (
+                        <>
+                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={`/api/memories/files/${encodeURIComponent(
                             file.id
@@ -735,6 +743,7 @@ export default function AlbumMediaManager({
                               "cover",
                           }}
                         />
+                        </>
                       )}
 
                       {isVideo && (

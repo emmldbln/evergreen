@@ -113,6 +113,7 @@ export default function GalleryGrid({
                   "0 14px 34px rgba(0,0,0,.10)";
               }}
             >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={photo.url}
                 alt={
