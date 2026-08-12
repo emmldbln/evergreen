@@ -1,54 +1,93 @@
 "use client";
 
-import GlassCard from "../ui/GlassCard";
+import { useEffect, useState } from "react";
+import { getDisplayName } from "@/lib/profile";
+import GlassCard from "@/app/components/ui/GlassCard";
 
 export default function GreetingCard() {
+  const [displayName, setDisplayName] = useState("Ann Kylie");
+
+  useEffect(() => {
+    setDisplayName(getDisplayName());
+  }, []);
+
   const hour = new Date().getHours();
 
   let greeting = "Good Evening 🌙";
 
-  if (hour < 12) greeting = "Good Morning ☀️";
-  else if (hour < 18) greeting = "Good Afternoon 🌿";
+  if (hour < 12) {
+    greeting = "Good Morning 🌞";
+  } else if (hour < 18) {
+    greeting = "Good Afternoon 🌤️";
+  }
 
   return (
     <GlassCard>
-      <div
+      {/* Greeting */}
+      <p
         style={{
-          padding: 34,
+          margin: 0,
+          fontSize: 19,
+          lineHeight: 1.4,
+          color: "#718176",
+          textAlign: "left",
         }}
       >
-        <p
-          style={{
-            color: "#6D7A70",
-            fontSize: 18,
-            marginBottom: 10,
-          }}
-        >
-          {greeting}
-        </p>
+        {greeting}
+      </p>
 
+      {/* Name + Heart */}
+      <div
+        style={{
+          position: "relative",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          margin: "12px 0 18px",
+          padding: "0 45px",
+        }}
+      >
         <h1
           style={{
-            fontSize: 60,
-            fontWeight: 700,
-            color: "#1E2D22",
-            lineHeight: 1,
+            margin: 0,
+            fontFamily: "var(--font-serif)",
+            fontSize: "clamp(38px, 5vw, 56px)",
+            lineHeight: 1.05,
+            fontWeight: 500,
+            color: "#263A2D",
+            textAlign: "center",
           }}
         >
-          Ann Kylie ❤️
+          {displayName}
         </h1>
 
-        <p
+        {/* Heart */}
+        <span
           style={{
-            color: "#6D7A70",
-            marginTop: 16,
-            fontSize: 18,
-            lineHeight: 1.6,
+            position: "absolute",
+            right: 0,
+            bottom: 4,
+            fontSize: "clamp(30px, 4vw, 44px)",
+            lineHeight: 1,
           }}
+          aria-hidden="true"
         >
-          Every day with you becomes another page in our story.
-        </p>
+      
+        </span>
       </div>
+
+      {/* Description */}
+      <p
+        style={{
+          margin: 0,
+          fontSize: 16,
+          lineHeight: 1.7,
+          color: "#718176",
+          textAlign: "center",
+        }}
+      >
+        Every day with you becomes another page in our story.
+      </p>
     </GlassCard>
   );
 }

@@ -4,22 +4,22 @@ import { useEffect, useState } from "react";
 
 interface Leaf {
   id: number;
-  left: number;
-  size: number;
-  duration: number;
-  delay: number;
-  rotation: number;
-  drift: number;
+  left: string;
+  size: string;
+  duration: string;
+  delay: string;
+  rotation: string;
+  drift: string;
   opacity: number;
 }
 
 interface Particle {
   id: number;
-  left: number;
-  top: number;
-  size: number;
-  duration: number;
-  delay: number;
+  left: string;
+  top: string;
+  size: string;
+  duration: string;
+  delay: string;
   opacity: number;
 }
 
@@ -29,8 +29,8 @@ interface Particle {
  * IMPORTANT:
  * Do not use Math.random() here.
  *
- * Because Background is rendered on both the server
- * and the client, the generated values must be identical.
+ * Background is rendered on both the server and client,
+ * so generated values must remain identical.
  */
 function seededRandom(seed: number): number {
   const x = Math.sin(seed * 12.9898) * 43758.5453;
@@ -40,6 +40,9 @@ function seededRandom(seed: number): number {
 
 /*
  * Generate leaves deterministically.
+ *
+ * CSS values are converted into fixed strings here so that
+ * server and client serialization remains identical.
  */
 function generateLeaves(): Leaf[] {
   return Array.from({ length: 20 }, (_, index) => {
@@ -49,17 +52,17 @@ function generateLeaves(): Leaf[] {
     return {
       id: index,
 
-      left: random(1) * 100,
+      left: `${(random(1) * 100).toFixed(4)}%`,
 
-      size: 18 + random(2) * 32,
+      size: `${(18 + random(2) * 32).toFixed(4)}px`,
 
-      duration: 15 + random(3) * 16,
+      duration: `${(15 + random(3) * 16).toFixed(4)}s`,
 
-      delay: random(4) * -30,
+      delay: `${(random(4) * -30).toFixed(4)}s`,
 
-      rotation: random(5) * 360,
+      rotation: `${(random(5) * 360).toFixed(4)}deg`,
 
-      drift: -120 + random(6) * 240,
+      drift: `${(-120 + random(6) * 240).toFixed(4)}px`,
 
       opacity: 0.13 + random(7) * 0.16,
     };
@@ -68,6 +71,9 @@ function generateLeaves(): Leaf[] {
 
 /*
  * Generate particles deterministically.
+ *
+ * CSS values are converted into fixed strings here so that
+ * server and client serialization remains identical.
  */
 function generateParticles(): Particle[] {
   return Array.from({ length: 45 }, (_, index) => {
@@ -77,15 +83,15 @@ function generateParticles(): Particle[] {
     return {
       id: index,
 
-      left: random(1) * 100,
+      left: `${(random(1) * 100).toFixed(4)}%`,
 
-      top: random(2) * 100,
+      top: `${(random(2) * 100).toFixed(4)}%`,
 
-      size: 2 + random(3) * 4,
+      size: `${(2 + random(3) * 4).toFixed(4)}px`,
 
-      duration: 4 + random(4) * 9,
+      duration: `${(4 + random(4) * 9).toFixed(4)}s`,
 
-      delay: random(5) * -12,
+      delay: `${(random(5) * -12).toFixed(4)}s`,
 
       opacity: 0.18 + random(6) * 0.30,
     };
@@ -100,9 +106,6 @@ export default function Background() {
 
   /*
    * Scroll parallax only.
-   *
-   * This effect does not generate anything and does not
-   * call setState synchronously when the component mounts.
    */
   useEffect(() => {
     const handleScroll = () => {
@@ -163,9 +166,7 @@ export default function Background() {
 
             filter: "blur(40px)",
 
-            transform: `translate3d(0, ${
-              scrollY * 0.08
-            }px, 0)`,
+            transform: `translate3d(0, ${scrollY * 0.08}px, 0)`,
 
             animation:
               "evergreenAuroraOne 16s ease-in-out infinite alternate",
@@ -196,9 +197,7 @@ export default function Background() {
 
             filter: "blur(50px)",
 
-            transform: `translate3d(0, ${
-              scrollY * -0.06
-            }px, 0)`,
+            transform: `translate3d(0, ${scrollY * -0.06}px, 0)`,
 
             animation:
               "evergreenAuroraTwo 19s ease-in-out infinite alternate",
@@ -255,9 +254,7 @@ export default function Background() {
 
             filter: "blur(35px)",
 
-            transform: `translate3d(0, ${
-              scrollY * 0.04
-            }px, 0)`,
+            transform: `translate3d(0, ${scrollY * 0.04}px, 0)`,
 
             animation:
               "evergreenSun 13s ease-in-out infinite alternate",
@@ -300,23 +297,22 @@ export default function Background() {
             style={{
               position: "absolute",
 
-              left: `${particle.left}%`,
-              top: `${particle.top}%`,
+              left: particle.left,
+              top: particle.top,
 
-              width: `${particle.size}px`,
-              height: `${particle.size}px`,
+              width: particle.size,
+              height: particle.size,
 
               borderRadius: "50%",
 
-              background:
-                "rgba(255,255,255,.95)",
+              background: "rgba(255,255,255,.95)",
 
               opacity: particle.opacity,
 
               boxShadow:
                 "0 0 12px rgba(255,255,255,.75)",
 
-              animation: `evergreenParticle ${particle.duration}s ease-in-out ${particle.delay}s infinite alternate`,
+              animation: `evergreenParticle ${particle.duration} ease-in-out ${particle.delay} infinite alternate`,
             }}
           />
         ))}
@@ -333,8 +329,7 @@ export default function Background() {
             left: "17%",
             top: "28%",
             borderRadius: "50%",
-            background:
-              "rgba(255,255,255,.65)",
+            background: "rgba(255,255,255,.65)",
             filter: "blur(2px)",
             boxShadow:
               "0 0 22px rgba(255,255,255,.65)",
@@ -351,8 +346,7 @@ export default function Background() {
             right: "19%",
             top: "55%",
             borderRadius: "50%",
-            background:
-              "rgba(255,255,255,.55)",
+            background: "rgba(255,255,255,.55)",
             filter: "blur(2px)",
             boxShadow:
               "0 0 20px rgba(255,255,255,.60)",
@@ -369,8 +363,7 @@ export default function Background() {
             left: "72%",
             top: "20%",
             borderRadius: "50%",
-            background:
-              "rgba(255,255,255,.50)",
+            background: "rgba(255,255,255,.50)",
             filter: "blur(3px)",
             boxShadow:
               "0 0 28px rgba(255,255,255,.60)",
@@ -389,15 +382,17 @@ export default function Background() {
             style={{
               position: "absolute",
 
-              left: `${leaf.left}%`,
+              left: leaf.left,
               top: "-80px",
 
-              width: `${leaf.size}px`,
-              height: `${leaf.size * 0.58}px`,
+              width: leaf.size,
+              height: `${(
+                parseFloat(leaf.size) * 0.58
+              ).toFixed(4)}px`,
 
               opacity: leaf.opacity,
 
-              animation: `evergreenLeaf ${leaf.duration}s linear ${leaf.delay}s infinite`,
+              animation: `evergreenLeaf ${leaf.duration} linear ${leaf.delay} infinite`,
             }}
           >
             {/* Leaf */}
@@ -413,7 +408,7 @@ export default function Background() {
                 background:
                   "linear-gradient(135deg, rgba(48,105,69,.88), rgba(92,145,104,.72) 55%, rgba(139,174,143,.55))",
 
-                transform: `rotate(${leaf.rotation}deg)`,
+                transform: `rotate(${leaf.rotation})`,
 
                 boxShadow:
                   "0 3px 10px rgba(54,95,76,.12)",
@@ -435,7 +430,7 @@ export default function Background() {
                 background:
                   "rgba(255,255,255,.30)",
 
-                transform: `rotate(${leaf.rotation}deg)`,
+                transform: `rotate(${leaf.rotation})`,
 
                 transformOrigin:
                   "left center",
