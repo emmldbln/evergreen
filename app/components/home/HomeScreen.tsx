@@ -5,7 +5,7 @@ import MemoryCard from "../cards/MemoryCard";
 import SongCard from "../cards/SongCard";
 import CountdownCard from "../cards/CountdownCard";
 
-import Background from "../ui/Background";
+
 
 import { usePlayback } from "@/lib/playback-store";
 
@@ -37,9 +37,6 @@ export default function HomeScreen({
         overflowX: "hidden",
       }}
     >
-      {/* Background */}
-
-      <Background />
 
       {/* Main Content */}
 

@@ -6,6 +6,7 @@ import {
 
 import "./globals.css";
 
+import Background from "./components/ui/Background";
 import BottomNavigation from "./components/navigation/BottomNavigation";
 import MiniPlayer from "./components/player/MiniPlayer";
 
@@ -48,15 +49,21 @@ export default function RootLayout({
           overflowX: "hidden",
           fontFamily: "var(--font-serif)",
           color: "#3F5345",
+          position: "relative",
+          isolation: "isolate",
         }}
       >
         <PlaybackProvider>
+          {/* Global animated background */}
+          <Background />
+
+          {/* Page content */}
           {children}
 
-          {/* ONE MiniPlayer */}
+          {/* Global player */}
           <MiniPlayer />
 
-          {/* ONE BottomNavigation */}
+          {/* Global navigation */}
           <BottomNavigation />
         </PlaybackProvider>
       </body>
