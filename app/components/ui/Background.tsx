@@ -23,90 +23,98 @@ interface Particle {
   opacity: number;
 }
 
+/*
+ * Deterministic pseudo-random generator.
+ *
+ * IMPORTANT:
+ * Do not use Math.random() here.
+ *
+ * Because Background is rendered on both the server
+ * and the client, the generated values must be identical.
+ */
+function seededRandom(seed: number): number {
+  const x = Math.sin(seed * 12.9898) * 43758.5453;
+
+  return x - Math.floor(x);
+}
+
+/*
+ * Generate leaves deterministically.
+ */
+function generateLeaves(): Leaf[] {
+  return Array.from({ length: 20 }, (_, index) => {
+    const random = (offset: number) =>
+      seededRandom(index * 100 + offset);
+
+    return {
+      id: index,
+
+      left: random(1) * 100,
+
+      size: 18 + random(2) * 32,
+
+      duration: 15 + random(3) * 16,
+
+      delay: random(4) * -30,
+
+      rotation: random(5) * 360,
+
+      drift: -120 + random(6) * 240,
+
+      opacity: 0.13 + random(7) * 0.16,
+    };
+  });
+}
+
+/*
+ * Generate particles deterministically.
+ */
+function generateParticles(): Particle[] {
+  return Array.from({ length: 45 }, (_, index) => {
+    const random = (offset: number) =>
+      seededRandom(index * 100 + offset + 5000);
+
+    return {
+      id: index,
+
+      left: random(1) * 100,
+
+      top: random(2) * 100,
+
+      size: 2 + random(3) * 4,
+
+      duration: 4 + random(4) * 9,
+
+      delay: random(5) * -12,
+
+      opacity: 0.18 + random(6) * 0.30,
+    };
+  });
+}
+
+const leaves = generateLeaves();
+const particles = generateParticles();
+
 export default function Background() {
-  const [leaves, setLeaves] = useState<Leaf[]>([]);
-  const [particles, setParticles] = useState<Particle[]>([]);
   const [scrollY, setScrollY] = useState(0);
 
+  /*
+   * Scroll parallax only.
+   *
+   * This effect does not generate anything and does not
+   * call setState synchronously when the component mounts.
+   */
   useEffect(() => {
-    /*
-     * Generate animated elements only after hydration.
-     *
-     * This prevents SSR/client hydration mismatches
-     * caused by Math.random().
-     */
-
-    const generatedLeaves: Leaf[] = Array.from(
-      { length: 20 },
-      (_, index) => ({
-        id: index,
-
-        left: Math.random() * 100,
-
-        size: 18 + Math.random() * 32,
-
-        duration: 15 + Math.random() * 16,
-
-        delay: Math.random() * -30,
-
-        rotation: Math.random() * 360,
-
-        drift:
-          -120 + Math.random() * 240,
-
-        opacity:
-          0.13 + Math.random() * 0.16,
-      })
-    );
-
-    const generatedParticles: Particle[] =
-      Array.from(
-        { length: 45 },
-        (_, index) => ({
-          id: index,
-
-          left: Math.random() * 100,
-
-          top: Math.random() * 100,
-
-          size:
-            2 + Math.random() * 4,
-
-          duration:
-            4 + Math.random() * 9,
-
-          delay:
-            Math.random() * -12,
-
-          opacity:
-            0.18 + Math.random() * 0.30,
-        })
-      );
-
-    setLeaves(generatedLeaves);
-    setParticles(generatedParticles);
-
-    /*
-     * Scroll parallax.
-     */
-
     const handleScroll = () => {
       setScrollY(window.scrollY);
     };
 
-    window.addEventListener(
-      "scroll",
-      handleScroll,
-      {
-        passive: true,
-      }
-    );
+    window.addEventListener("scroll", handleScroll, {
+      passive: true,
+    });
 
     return () => {
-      window.removeEventListener(
-        "scroll",
-        handleScroll
-      );
+      window.removeEventListener("scroll", handleScroll);
     };
   }, []);
 
@@ -288,23 +296,22 @@ export default function Background() {
 
         {particles.map((particle) => (
           <div
-            key={particle.id}
+            key={`particle-${particle.id}`}
             style={{
               position: "absolute",
 
               left: `${particle.left}%`,
               top: `${particle.top}%`,
 
-              width: particle.size,
-              height: particle.size,
+              width: `${particle.size}px`,
+              height: `${particle.size}px`,
 
               borderRadius: "50%",
 
               background:
                 "rgba(255,255,255,.95)",
 
-              opacity:
-                particle.opacity,
+              opacity: particle.opacity,
 
               boxShadow:
                 "0 0 12px rgba(255,255,255,.75)",
@@ -378,19 +385,17 @@ export default function Background() {
 
         {leaves.map((leaf) => (
           <div
-            key={leaf.id}
+            key={`leaf-${leaf.id}`}
             style={{
               position: "absolute",
 
               left: `${leaf.left}%`,
               top: "-80px",
 
-              width: leaf.size,
-              height:
-                leaf.size * 0.58,
+              width: `${leaf.size}px`,
+              height: `${leaf.size * 0.58}px`,
 
-              opacity:
-                leaf.opacity,
+              opacity: leaf.opacity,
 
               animation: `evergreenLeaf ${leaf.duration}s linear ${leaf.delay}s infinite`,
             }}
@@ -422,7 +427,7 @@ export default function Background() {
                 position: "absolute",
 
                 width: "72%",
-                height: 1,
+                height: "1px",
 
                 left: "14%",
                 top: "50%",
