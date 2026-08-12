@@ -139,3 +139,94 @@ export async function deleteFirestoreAlbum(
 
   await deleteDoc(albumRef);
 }
+
+export async function getHomepageFirestoreMemories(): Promise<
+  Array<{
+    image: string;
+    albumId: string;
+    albumTitle: string;
+    date: string;
+    location: string;
+    story: string;
+  }>
+> {
+  const albums =
+    await getFirestoreAlbums();
+
+  const memories: Array<{
+    image: string;
+    albumId: string;
+    albumTitle: string;
+    date: string;
+    location: string;
+    story: string;
+  }> = [];
+
+  albums.forEach((album) => {
+    /*
+     * =====================================================
+     * ALBUM COVER
+     * =====================================================
+     *
+     * The cover is stored separately from mediaFiles.
+     * Include it as the first homepage memory.
+     */
+    if (album.coverFileId) {
+      memories.push({
+        image: `/api/memories/files/${encodeURIComponent(
+          album.coverFileId
+        )}`,
+        albumId: album.id,
+        albumTitle: album.title,
+        date: album.date,
+        location: album.location,
+        story: album.story,
+      });
+    }
+
+    /*
+     * =====================================================
+     * ALBUM MEDIA
+     * =====================================================
+     *
+     * Add image media after the album cover.
+     * Videos are intentionally excluded because the
+     * homepage MemoryCard is an image-based card.
+     */
+    const mediaFiles =
+      album.mediaFiles ?? [];
+
+    mediaFiles.forEach((file) => {
+      if (
+        !file.mimeType.startsWith(
+          "image/"
+        )
+      ) {
+        return;
+      }
+
+      /*
+       * Avoid accidentally displaying the cover twice
+       * if it ever becomes part of mediaFiles in the future.
+       */
+      if (
+        file.id === album.coverFileId
+      ) {
+        return;
+      }
+
+      memories.push({
+        image: `/api/memories/files/${encodeURIComponent(
+          file.id
+        )}`,
+        albumId: album.id,
+        albumTitle: album.title,
+        date: album.date,
+        location: album.location,
+        story: album.story,
+      });
+    });
+  });
+
+  return memories;
+}

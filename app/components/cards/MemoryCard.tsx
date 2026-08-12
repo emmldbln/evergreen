@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import GlassCard from "../ui/GlassCard";
 
@@ -77,6 +78,17 @@ export default function MemoryCard({
           overflow: "hidden",
         }}
       >
+        <Image
+          src={memory.image}
+          alt={memory.albumTitle}
+          fill
+          sizes="(max-width: 470px) 100vw, 470px"
+          style={{
+          objectFit: "cover",
+          }}
+          unoptimized
+        />
+        
         {/* Image overlay */}
 
         <div
