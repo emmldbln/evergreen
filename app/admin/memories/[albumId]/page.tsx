@@ -4,7 +4,6 @@ import Link from "next/link";
 
 import {
   getFirestoreAlbum,
-  updateFirestoreAlbum,
 } from "@/lib/firestore/memories";
 
 import AlbumMediaManager from "./AlbumMediaManager";
@@ -65,15 +64,45 @@ async function updateAlbum(
     );
   }
 
-  await updateFirestoreAlbum(
-    albumId,
+  /*
+   * Use the same album API used by
+   * Settings/Memories.
+   *
+   * This keeps Firestore and Google Drive
+   * synchronized when an album is renamed.
+   */
+  const baseUrl =
+    process.env.NEXT_PUBLIC_APP_URL ??
+    process.env.APP_URL ??
+    "http://localhost:3000";
+
+  const response = await fetch(
+    `${baseUrl}/api/memories/albums/${albumId}`,
     {
-      title,
-      date,
-      location,
-      story,
+      method: "PATCH",
+      headers: {
+        "Content-Type":
+          "application/json",
+      },
+      body: JSON.stringify({
+        title,
+        date,
+        location,
+        story,
+      }),
+      cache: "no-store",
     }
   );
+
+  const data =
+    await response.json();
+
+  if (!response.ok) {
+    throw new Error(
+      data.error ??
+        "Failed to update album."
+    );
+  }
 
   revalidatePath(
     `/admin/memories/${albumId}`
@@ -81,6 +110,10 @@ async function updateAlbum(
 
   revalidatePath(
     "/admin/memories"
+  );
+
+  revalidatePath(
+    "/settings/memories"
   );
 
   redirect(
@@ -206,9 +239,7 @@ export default async function AlbumPage({
           </Link>
         </header>
 
-        {/* ================================================= */}
         {/* ALBUM DETAILS */}
-        {/* ================================================= */}
 
         <section
           style={{
@@ -384,9 +415,7 @@ export default async function AlbumPage({
           </form>
         </section>
 
-        {/* ================================================= */}
         {/* INTERACTIVE MEDIA */}
-        {/* ================================================= */}
 
         <AlbumMediaManager
           albumId={album.id}

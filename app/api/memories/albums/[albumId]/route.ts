@@ -2,12 +2,14 @@ import { NextResponse } from "next/server";
 
 import {
   getFirestoreAlbum,
+  getFirestoreAlbums,
   updateFirestoreAlbum,
   deleteFirestoreAlbum,
 } from "@/lib/firestore/memories";
 
 import {
   deleteDriveFolder,
+  driveItemExists,
   updateDriveFileName,
 } from "@/lib/google-drive";
 
@@ -96,32 +98,54 @@ export async function PATCH(
     }
 
     /*
-     * If the album title changes,
-     * keep the Google Drive folder
-     * name synchronized with it.
+     * =================================================
+     * GOOGLE DRIVE RENAME
+     * =================================================
      *
-     * The Drive folder ID is already
-     * stored in Firestore, so we do
-     * not need to search for it.
+     * The Drive folder is identified by its
+     * stored ID, NOT by its album name.
+     *
+     * This means:
+     *
+     * Album A: Test
+     * Album B: Test
+     *
+     * can safely exist as separate folders.
      */
     if (
       title !== album.title &&
       album.driveFolderId
     ) {
-      await updateDriveFileName(
-        album.driveFolderId,
-        title
-      );
+      const driveExists =
+        await driveItemExists(
+          album.driveFolderId
+        );
+
+      /*
+       * If the folder still exists,
+       * synchronize its name.
+       *
+       * If the folder was already deleted,
+       * don't fail the entire Firestore update.
+       */
+      if (driveExists) {
+        await updateDriveFileName(
+          album.driveFolderId,
+          title
+        );
+      } else {
+        console.warn(
+          `Drive folder ${album.driveFolderId} no longer exists. Updating Firestore album anyway.`
+        );
+      }
     }
 
     /*
-     * Update the Firestore album.
-     *
-     * The public Memories pages read
-     * this same Firestore document, so
-     * the updated details will be used
-     * by the public site automatically.
+     * =================================================
+     * FIRESTORE UPDATE
+     * =================================================
      */
+
     await updateFirestoreAlbum(
       albumId,
       {
@@ -192,6 +216,12 @@ export async function DELETE(
       );
     }
 
+    /*
+     * =================================================
+     * FIND ALBUM
+     * =================================================
+     */
+
     const album =
       await getFirestoreAlbum(
         albumId
@@ -209,26 +239,90 @@ export async function DELETE(
       );
     }
 
+    const driveFolderId =
+      album.driveFolderId;
+
+    let driveFolderIsShared = false;
+
     /*
-     * Delete the physical Google Drive
-     * album folder and everything inside it.
+     * =================================================
+     * PROTECT SHARED DRIVE FOLDERS
+     * =================================================
      *
-     * We do this before deleting the
-     * Firestore document so that the
-     * Firestore record is not removed
-     * while its physical files remain.
+     * This is especially important for albums
+     * created before the folder-reuse bug was fixed.
+     *
+     * Example:
+     *
+     * Album A ──┐
+     *           ├── Drive Folder 123
+     * Album B ──┘
+     *
+     * Deleting Album A must NOT delete Folder 123,
+     * because Album B still uses it.
      */
-    if (album.driveFolderId) {
-      await deleteDriveFolder(
-        album.driveFolderId
-      );
+
+    if (driveFolderId) {
+      const allAlbums =
+        await getFirestoreAlbums();
+
+      driveFolderIsShared =
+        allAlbums.some(
+          (otherAlbum) =>
+            otherAlbum.id !== albumId &&
+            otherAlbum.driveFolderId ===
+              driveFolderId
+        );
     }
 
     /*
-     * Remove the album document from
-     * Firestore after its Drive contents
-     * have been successfully deleted.
+     * =================================================
+     * DELETE GOOGLE DRIVE FOLDER
+     * =================================================
      */
+
+    if (driveFolderId) {
+      if (driveFolderIsShared) {
+        /*
+         * Another album still references
+         * this Drive folder.
+         *
+         * NEVER delete the folder.
+         */
+        console.warn(
+          `Skipping Drive deletion for album ${albumId}. Drive folder ${driveFolderId} is shared by another album.`
+        );
+      } else {
+        /*
+         * The Drive folder may already have been
+         * deleted by the old buggy behavior.
+         *
+         * In that case, simply continue with
+         * Firestore cleanup.
+         */
+        const driveExists =
+          await driveItemExists(
+            driveFolderId
+          );
+
+        if (driveExists) {
+          await deleteDriveFolder(
+            driveFolderId
+          );
+        } else {
+          console.warn(
+            `Drive folder ${driveFolderId} does not exist. Continuing with Firestore deletion.`
+          );
+        }
+      }
+    }
+
+    /*
+     * =================================================
+     * DELETE FIRESTORE ALBUM
+     * =================================================
+     */
+
     await deleteFirestoreAlbum(
       albumId
     );
@@ -236,8 +330,18 @@ export async function DELETE(
     return NextResponse.json(
       {
         success: true,
+
         deletedAlbumId:
           albumId,
+
+        driveFolderDeleted:
+          Boolean(
+            driveFolderId &&
+              !driveFolderIsShared
+          ),
+
+        driveFolderWasShared:
+          driveFolderIsShared,
       },
       {
         status: 200,
