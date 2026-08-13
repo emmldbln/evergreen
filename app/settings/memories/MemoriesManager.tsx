@@ -2,6 +2,7 @@
 
 import {
   useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -20,17 +21,16 @@ import {
   Pencil,
   FolderHeart,
   Loader2,
+  Trash2,
+  ImagePlus,
+  Upload,
 } from "lucide-react";
 
 import GlassCard from "@/app/components/ui/GlassCard";
 
 import {
-  addFirestoreAlbum,
   updateFirestoreAlbum,
-} from "@/lib/firestore/memories";
-
-import type {
-  FirestoreAlbum,
+  type FirestoreAlbum,
 } from "@/lib/firestore/memories";
 
 /* =========================================================
@@ -55,14 +55,17 @@ interface DisplayMedia {
   src: string;
 }
 
+interface PendingMedia {
+  id: string;
+  file: File;
+  previewUrl: string;
+}
+
 interface AlbumFormData {
   title: string;
   date: string;
   location: string;
   story: string;
-  coverUrl: string;
-  coverFileId: string;
-  driveFolderId: string;
 }
 
 /* =========================================================
@@ -75,18 +78,10 @@ function getMediaItems(
   const items: DisplayMedia[] = [];
 
   /*
-   * -------------------------------------------------------
-   * COVER
-   * -------------------------------------------------------
+   * Cover is counted as media.
    *
-   * The cover is considered part of the album's media.
-   *
-   * This means:
-   *
-   *   1 cover + 3 media files = 4 items
-   *
-   * If the cover is already inside mediaFiles, we avoid
-   * adding it twice.
+   * Example:
+   * 1 cover + 3 media = 4 items
    */
 
   if (album.coverFileId) {
@@ -99,9 +94,6 @@ function getMediaItems(
       )}`,
     });
   } else if (album.coverUrl) {
-    /*
-     * Legacy albums may only have coverUrl.
-     */
     items.push({
       id: `${album.id}-cover`,
       name: "Cover Photo",
@@ -111,9 +103,7 @@ function getMediaItems(
   }
 
   /*
-   * -------------------------------------------------------
-   * STRUCTURED MEDIA
-   * -------------------------------------------------------
+   * Structured media
    */
 
   if (
@@ -121,9 +111,6 @@ function getMediaItems(
     album.mediaFiles.length > 0
   ) {
     for (const file of album.mediaFiles) {
-      /*
-       * Prevent duplicate cover.
-       */
       if (
         album.coverFileId &&
         file.id === album.coverFileId
@@ -145,9 +132,7 @@ function getMediaItems(
   }
 
   /*
-   * -------------------------------------------------------
-   * LEGACY MEDIA
-   * -------------------------------------------------------
+   * Legacy media
    */
 
   if (
@@ -157,10 +142,6 @@ function getMediaItems(
     album.media
       .filter(Boolean)
       .forEach((src, index) => {
-        /*
-         * Don't duplicate the cover when the old media
-         * array already contains the same URL.
-         */
         if (
           album.coverUrl &&
           src === album.coverUrl
@@ -214,15 +195,12 @@ function getCoverSrc(
   return "";
 }
 
-function createEmptyAlbumForm(): AlbumFormData {
+function createEmptyForm(): AlbumFormData {
   return {
     title: "",
     date: "",
     location: "",
     story: "",
-    coverUrl: "",
-    coverFileId: "",
-    driveFolderId: "",
   };
 }
 
@@ -234,10 +212,6 @@ function albumToForm(
     date: album.date ?? "",
     location: album.location ?? "",
     story: album.story ?? "",
-    coverUrl: album.coverUrl ?? "",
-    coverFileId: album.coverFileId ?? "",
-    driveFolderId:
-      album.driveFolderId ?? "",
   };
 }
 
@@ -248,19 +222,16 @@ function albumToForm(
 export default function MemoriesManager({
   initialAlbums,
 }: Props) {
-  const safeAlbums =
-    initialAlbums ?? [];
-
   const [albums, setAlbums] =
     useState<SerializableAlbum[]>(
-      safeAlbums
+      initialAlbums ?? []
     );
 
   const [
     selectedAlbumId,
     setSelectedAlbumId,
   ] = useState<string | null>(
-    safeAlbums[0]?.id ?? null
+    initialAlbums?.[0]?.id ?? null
   );
 
   const [
@@ -269,12 +240,6 @@ export default function MemoriesManager({
   ] = useState<DisplayMedia | null>(
     null
   );
-
-  /*
-   * -------------------------------------------------------
-   * ALBUM MODAL STATE
-   * -------------------------------------------------------
-   */
 
   const [
     albumModalOpen,
@@ -293,7 +258,7 @@ export default function MemoriesManager({
     albumForm,
     setAlbumForm,
   ] = useState<AlbumFormData>(
-    createEmptyAlbumForm()
+    createEmptyForm()
   );
 
   const [
@@ -306,9 +271,10 @@ export default function MemoriesManager({
     setAlbumError,
   ] = useState("");
 
-  /* =======================================================
-     DERIVED DATA
-  ======================================================= */
+  const [
+    deletingAlbumId,
+    setDeletingAlbumId,
+  ] = useState<string | null>(null);
 
   const selectedAlbum =
     useMemo(
@@ -324,27 +290,13 @@ export default function MemoriesManager({
       ]
     );
 
-  /*
-   * IMPORTANT:
-   *
-   * getMediaItems() already includes the cover.
-   *
-   * Therefore:
-   *
-   * cover + 3 media = 4
-   */
   const totalMedia =
     useMemo(
       () =>
         albums.reduce(
-          (
-            total,
-            album
-          ) =>
+          (total, album) =>
             total +
-            getMediaItems(
-              album
-            ).length,
+            getMediaItems(album).length,
           0
         ),
       [albums]
@@ -363,13 +315,13 @@ export default function MemoriesManager({
     );
 
   /* =======================================================
-     MODAL ACTIONS
+     ALBUM ACTIONS
   ======================================================= */
 
   function openCreateAlbum() {
     setEditingAlbum(null);
     setAlbumForm(
-      createEmptyAlbumForm()
+      createEmptyForm()
     );
     setAlbumError("");
     setAlbumModalOpen(true);
@@ -394,7 +346,7 @@ export default function MemoriesManager({
     setAlbumModalOpen(false);
     setEditingAlbum(null);
     setAlbumForm(
-      createEmptyAlbumForm()
+      createEmptyForm()
     );
     setAlbumError("");
   }
@@ -411,7 +363,36 @@ export default function MemoriesManager({
     );
   }
 
-  async function handleSaveAlbum() {
+  function replaceAlbum(
+    updatedAlbum: SerializableAlbum
+  ) {
+    setAlbums(
+      (current) =>
+        current.map((album) =>
+          album.id ===
+          updatedAlbum.id
+            ? updatedAlbum
+            : album
+        )
+    );
+
+    setEditingAlbum(
+      updatedAlbum
+    );
+
+    setSelectedAlbumId(
+      updatedAlbum.id
+    );
+  }
+
+  /* =======================================================
+     CREATE / UPDATE ALBUM
+  ======================================================= */
+
+  async function handleSaveAlbum(
+    coverFile: File | null,
+    pendingMedia: PendingMedia[]
+  ) {
     setAlbumError("");
 
     const title =
@@ -424,52 +405,10 @@ export default function MemoriesManager({
       return;
     }
 
-    if (
-      !albumForm.driveFolderId.trim()
-    ) {
-      setAlbumError(
-        "Google Drive folder ID is required."
-      );
-      return;
-    }
-
     setSavingAlbum(true);
 
     try {
-      const albumData = {
-        title,
-        date:
-          albumForm.date.trim(),
-        location:
-          albumForm.location.trim(),
-        story:
-          albumForm.story.trim(),
-        coverUrl:
-          albumForm.coverUrl.trim(),
-        ...(albumForm.coverFileId.trim()
-          ? {
-              coverFileId:
-                albumForm.coverFileId.trim(),
-            }
-          : {}),
-        media:
-          editingAlbum?.media ??
-          [],
-        ...(editingAlbum?.mediaFileIds
-          ? {
-              mediaFileIds:
-                editingAlbum.mediaFileIds,
-            }
-          : {}),
-        ...(editingAlbum?.mediaFiles
-          ? {
-              mediaFiles:
-                editingAlbum.mediaFiles,
-            }
-          : {}),
-        driveFolderId:
-          albumForm.driveFolderId.trim(),
-      };
+      let album: SerializableAlbum;
 
       /*
        * ---------------------------------------------------
@@ -478,66 +417,256 @@ export default function MemoriesManager({
        */
 
       if (!editingAlbum) {
-        const newAlbumId =
-          await addFirestoreAlbum(
-            albumData
+        const response =
+          await fetch(
+            "/api/memories/albums",
+            {
+              method: "POST",
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+              body: JSON.stringify({
+                title,
+                date:
+                  albumForm.date.trim(),
+                location:
+                  albumForm.location.trim(),
+                story:
+                  albumForm.story.trim(),
+              }),
+            }
           );
 
-        const newAlbum: SerializableAlbum =
-          {
-            id: newAlbumId,
-            ...albumData,
-            createdAt:
-              new Date().toISOString(),
-          };
+        const data =
+          await response.json();
 
+        if (!response.ok) {
+          throw new Error(
+            data.error ??
+              "Failed to create album."
+          );
+        }
+
+        if (
+          !data.album?.id
+        ) {
+          throw new Error(
+            "Album was created but no album ID was returned."
+          );
+        }
+
+        album = {
+          id: data.album.id,
+          title,
+          date:
+            albumForm.date.trim(),
+          location:
+            albumForm.location.trim(),
+          story:
+            albumForm.story.trim(),
+          coverUrl:
+            data.album.coverUrl ??
+            "",
+          media:
+            data.album.media ??
+            [],
+          driveFolderId:
+            data.album
+              .driveFolderId ??
+            "",
+          createdAt:
+            new Date().toISOString(),
+        };
+      } else {
+        /*
+         * -------------------------------------------------
+         * UPDATE
+         * -------------------------------------------------
+         */
+
+        await updateFirestoreAlbum(
+          editingAlbum.id,
+          {
+            title,
+            date:
+              albumForm.date.trim(),
+            location:
+              albumForm.location.trim(),
+            story:
+              albumForm.story.trim(),
+          }
+        );
+
+        album = {
+          ...editingAlbum,
+          title,
+          date:
+            albumForm.date.trim(),
+          location:
+            albumForm.location.trim(),
+          story:
+            albumForm.story.trim(),
+        };
+      }
+
+      /*
+       * Put the album into local state
+       * before uploading files.
+       */
+
+      if (
+        editingAlbum
+      ) {
+        replaceAlbum(album);
+      } else {
         setAlbums(
           (current) => [
-            newAlbum,
+            album,
             ...current,
           ]
         );
 
         setSelectedAlbumId(
-          newAlbumId
+          album.id
         );
 
-        closeAlbumModal();
-        return;
+        setEditingAlbum(
+          album
+        );
       }
 
       /*
        * ---------------------------------------------------
-       * UPDATE
+       * COVER
        * ---------------------------------------------------
        */
 
-      await updateFirestoreAlbum(
-        editingAlbum.id,
-        albumData
+      if (coverFile) {
+        const formData =
+          new FormData();
+
+        formData.append(
+          "file",
+          coverFile
+        );
+
+        formData.append(
+          "type",
+          "cover"
+        );
+
+        const response =
+          await fetch(
+            `/api/memories/albums/${encodeURIComponent(
+              album.id
+            )}/upload`,
+            {
+              method: "POST",
+              body: formData,
+            }
+          );
+
+        const data =
+          await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data.error ??
+              "Failed to upload album cover."
+          );
+        }
+
+        if (data.album) {
+          album = {
+            ...album,
+            ...data.album,
+            createdAt:
+              album.createdAt,
+          };
+
+          replaceAlbum(
+            album
+          );
+        }
+      }
+
+      /*
+       * ---------------------------------------------------
+       * MEDIA
+       * ---------------------------------------------------
+       */
+
+      for (
+        let index = 0;
+        index <
+        pendingMedia.length;
+        index++
+      ) {
+        const pending =
+          pendingMedia[index];
+
+        const formData =
+          new FormData();
+
+        formData.append(
+          "file",
+          pending.file
+        );
+
+        formData.append(
+          "type",
+          "media"
+        );
+
+        const response =
+          await fetch(
+            `/api/memories/albums/${encodeURIComponent(
+              album.id
+            )}/upload`,
+            {
+              method: "POST",
+              body: formData,
+            }
+          );
+
+        const data =
+          await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data.error ??
+              `Failed to upload media ${index + 1}.`
+          );
+        }
+
+        if (data.album) {
+          album = {
+            ...album,
+            ...data.album,
+            createdAt:
+              album.createdAt,
+          };
+
+          replaceAlbum(
+            album
+          );
+        }
+      }
+
+      /*
+       * Finished.
+       */
+
+      pendingMedia.forEach(
+        (media) => {
+          URL.revokeObjectURL(
+            media.previewUrl
+          );
+        }
       );
 
-      const updatedAlbum: SerializableAlbum =
-        {
-          ...editingAlbum,
-          ...albumData,
-        };
-
-      setAlbums(
-        (current) =>
-          current.map(
-            (album) =>
-              album.id ===
-              editingAlbum.id
-                ? updatedAlbum
-                : album
-          )
-      );
-
-      setSelectedAlbumId(
-        editingAlbum.id
-      );
-
+      setSavingAlbum(false);
       closeAlbumModal();
     } catch (error) {
       console.error(
@@ -546,10 +675,97 @@ export default function MemoriesManager({
       );
 
       setAlbumError(
-        "Something went wrong while saving the album. Please try again."
+        error instanceof Error
+          ? error.message
+          : "Something went wrong while saving the album."
+      );
+
+      setSavingAlbum(false);
+    }
+  }
+
+  /* =======================================================
+     DELETE ALBUM
+  ======================================================= */
+
+  async function handleDeleteAlbum(
+    album: SerializableAlbum
+  ) {
+    const confirmed =
+      window.confirm(
+        `Delete "${album.title}"?\n\nThis will permanently delete the album and its Google Drive folder and files.`
+      );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingAlbumId(
+      album.id
+    );
+
+    try {
+      const response =
+        await fetch(
+          `/api/memories/albums/${encodeURIComponent(
+            album.id
+          )}`,
+          {
+            method: "DELETE",
+          }
+        );
+
+      const data =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ??
+            "Failed to delete album."
+        );
+      }
+
+      const remaining =
+        albums.filter(
+          (item) =>
+            item.id !== album.id
+        );
+
+      setAlbums(
+        remaining
+      );
+
+      if (
+        selectedAlbumId ===
+        album.id
+      ) {
+        setSelectedAlbumId(
+          remaining[0]?.id ??
+            null
+        );
+      }
+
+      if (
+        editingAlbum?.id ===
+        album.id
+      ) {
+        closeAlbumModal();
+      }
+    } catch (error) {
+      console.error(
+        "Delete album error:",
+        error
+      );
+
+      window.alert(
+        error instanceof Error
+          ? error.message
+          : "Failed to delete album."
       );
     } finally {
-      setSavingAlbum(false);
+      setDeletingAlbumId(
+        null
+      );
     }
   }
 
@@ -664,6 +880,8 @@ export default function MemoriesManager({
                 moments together.
               </p>
             </div>
+
+            {/* NEW ALBUM IS OUTSIDE THE EDITOR */}
 
             <button
               type="button"
@@ -825,161 +1043,239 @@ export default function MemoriesManager({
                         ).length;
 
                       return (
-                        <button
+                        <div
                           key={
                             album.id
                           }
-                          type="button"
-                          onClick={() =>
-                            setSelectedAlbumId(
-                              album.id
-                            )
-                          }
                           style={{
-                            width:
-                              "100%",
-                            border:
-                              "1px solid transparent",
-                            borderColor:
-                              active
-                                ? "rgba(69,108,87,.20)"
-                                : "transparent",
-                            borderRadius:
-                              17,
-                            padding: 9,
-                            background:
-                              active
-                                ? "rgba(69,108,87,.09)"
-                                : "rgba(69,108,87,.035)",
-                            cursor:
-                              "pointer",
-                            display:
-                              "flex",
-                            alignItems:
-                              "center",
-                            gap: 11,
-                            textAlign:
-                              "left",
-                            transition:
-                              "all .2s ease",
+                            position:
+                              "relative",
                           }}
                         >
-                          <div
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setSelectedAlbumId(
+                                album.id
+                              )
+                            }
                             style={{
-                              position:
-                                "relative",
-                              width: 58,
-                              height: 58,
-                              flexShrink: 0,
+                              width:
+                                "100%",
+                              border:
+                                "1px solid transparent",
+                              borderColor:
+                                active
+                                  ? "rgba(69,108,87,.20)"
+                                  : "transparent",
                               borderRadius:
-                                13,
-                              overflow:
-                                "hidden",
+                                17,
+                              padding: 9,
+                              paddingRight: 48,
                               background:
-                                "rgba(69,108,87,.10)",
+                                active
+                                  ? "rgba(69,108,87,.09)"
+                                  : "rgba(69,108,87,.035)",
+                              cursor:
+                                "pointer",
+                              display:
+                                "flex",
+                              alignItems:
+                                "center",
+                              gap: 11,
+                              textAlign:
+                                "left",
+                              transition:
+                                "all .2s ease",
                             }}
                           >
-                            {coverSrc ? (
-                              <Image
-                                src={
-                                  coverSrc
-                                }
-                                alt={
-                                  album.title
-                                }
-                                fill
-                                sizes="58px"
-                                style={{
-                                  objectFit:
-                                    "cover",
-                                }}
-                                unoptimized
-                              />
-                            ) : (
+                            <div
+                              style={{
+                                position:
+                                  "relative",
+                                width: 58,
+                                height: 58,
+                                flexShrink: 0,
+                                borderRadius:
+                                  13,
+                                overflow:
+                                  "hidden",
+                                background:
+                                  "rgba(69,108,87,.10)",
+                              }}
+                            >
+                              {coverSrc ? (
+                                <Image
+                                  src={
+                                    coverSrc
+                                  }
+                                  alt={
+                                    album.title
+                                  }
+                                  fill
+                                  sizes="58px"
+                                  style={{
+                                    objectFit:
+                                      "cover",
+                                  }}
+                                  unoptimized
+                                />
+                              ) : (
+                                <div
+                                  style={{
+                                    width:
+                                      "100%",
+                                    height:
+                                      "100%",
+                                    display:
+                                      "flex",
+                                    alignItems:
+                                      "center",
+                                    justifyContent:
+                                      "center",
+                                    color:
+                                      "#8A968C",
+                                  }}
+                                >
+                                  <Images
+                                    size={
+                                      22
+                                    }
+                                  />
+                                </div>
+                              )}
+                            </div>
+
+                            <div
+                              style={{
+                                minWidth:
+                                  0,
+                                flex: 1,
+                              }}
+                            >
                               <div
                                 style={{
-                                  width:
-                                    "100%",
-                                  height:
-                                    "100%",
-                                  display:
-                                    "flex",
-                                  alignItems:
-                                    "center",
-                                  justifyContent:
-                                    "center",
+                                  fontSize:
+                                    14,
+                                  fontWeight:
+                                    700,
+                                  color:
+                                    "#3F5345",
+                                  overflow:
+                                    "hidden",
+                                  textOverflow:
+                                    "ellipsis",
+                                  whiteSpace:
+                                    "nowrap",
+                                }}
+                              >
+                                {
+                                  album.title
+                                }
+                              </div>
+
+                              <div
+                                style={{
+                                  marginTop:
+                                    4,
+                                  fontSize:
+                                    11,
                                   color:
                                     "#8A968C",
                                 }}
                               >
-                                <Images
-                                  size={
-                                    22
-                                  }
-                                />
+                                {
+                                  mediaCount
+                                }{" "}
+                                {mediaCount ===
+                                1
+                                  ? "item"
+                                  : "items"}
                               </div>
-                            )}
-                          </div>
+                            </div>
 
-                          <div
+                            <ChevronRight
+                              size={
+                                16
+                              }
+                              color={
+                                active
+                                  ? "#456C57"
+                                  : "#A1AAA3"
+                              }
+                            />
+                          </button>
+
+                          {/* DELETE IS OUTSIDE THE EDIT PANEL */}
+
+                          <button
+                            type="button"
+                            onClick={(
+                              event
+                            ) => {
+                              event.stopPropagation();
+
+                              void handleDeleteAlbum(
+                                album
+                              );
+                            }}
+                            disabled={
+                              deletingAlbumId ===
+                              album.id
+                            }
+                            aria-label={`Delete ${album.title}`}
                             style={{
-                              minWidth:
-                                0,
-                              flex: 1,
+                              position:
+                                "absolute",
+                              right: 8,
+                              top: "50%",
+                              transform:
+                                "translateY(-50%)",
+                              width: 30,
+                              height: 30,
+                              border:
+                                "none",
+                              borderRadius:
+                                10,
+                              background:
+                                "rgba(180,70,70,.08)",
+                              color:
+                                "#A35B5B",
+                              display:
+                                "flex",
+                              alignItems:
+                                "center",
+                              justifyContent:
+                                "center",
+                              cursor:
+                                deletingAlbumId ===
+                                album.id
+                                  ? "default"
+                                  : "pointer",
+                              opacity:
+                                deletingAlbumId ===
+                                album.id
+                                  ? 0.55
+                                  : 1,
                             }}
                           >
-                            <div
-                              style={{
-                                fontSize:
-                                  14,
-                                fontWeight:
-                                  700,
-                                color:
-                                  "#3F5345",
-                                overflow:
-                                  "hidden",
-                                textOverflow:
-                                  "ellipsis",
-                                whiteSpace:
-                                  "nowrap",
-                              }}
-                            >
-                              {
-                                album.title
-                              }
-                            </div>
-
-                            <div
-                              style={{
-                                marginTop:
-                                  4,
-                                fontSize:
-                                  11,
-                                color:
-                                  "#8A968C",
-                              }}
-                            >
-                              {
-                                mediaCount
-                              }{" "}
-                              {mediaCount ===
-                              1
-                                ? "item"
-                                : "items"}
-                            </div>
-                          </div>
-
-                          <ChevronRight
-                            size={
-                              16
-                            }
-                            color={
-                              active
-                                ? "#456C57"
-                                : "#A1AAA3"
-                            }
-                          />
-                        </button>
+                            {deletingAlbumId ===
+                            album.id ? (
+                              <Loader2
+                                size={
+                                  14
+                                }
+                                className="spin"
+                              />
+                            ) : (
+                              <Trash2
+                                size={
+                                  14
+                                }
+                              />
+                            )}
+                          </button>
+                        </div>
                       );
                     }
                   )}
@@ -1013,7 +1309,7 @@ export default function MemoriesManager({
       </div>
 
       {/* =================================================
-          MEDIA LIGHTBOX
+          LIGHTBOX
       ================================================= */}
 
       {selectedMedia && (
@@ -1030,7 +1326,7 @@ export default function MemoriesManager({
       )}
 
       {/* =================================================
-          CREATE / EDIT ALBUM MODAL
+          EDIT / CREATE MODAL
       ================================================= */}
 
       {albumModalOpen && (
@@ -1056,6 +1352,9 @@ export default function MemoriesManager({
           onSave={
             handleSaveAlbum
           }
+          onAlbumUpdated={
+            replaceAlbum
+          }
         />
       )}
 
@@ -1074,6 +1373,20 @@ export default function MemoriesManager({
 
           .memories-stats {
             grid-template-columns: 1fr !important;
+          }
+        }
+
+        .spin {
+          animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+          from {
+            transform: rotate(0deg);
+          }
+
+          to {
+            transform: rotate(360deg);
           }
         }
       `}</style>
@@ -1099,20 +1412,14 @@ function AlbumDetail({
   ) => void;
 }) {
   const mediaItems =
-    getMediaItems(
-      album
-    );
+    getMediaItems(album);
 
   const coverSrc =
-    getCoverSrc(
-      album
-    );
+    getCoverSrc(album);
 
   return (
     <div>
-      {/* =================================================
-          COVER
-      ================================================= */}
+      {/* COVER */}
 
       <div
         style={{
@@ -1128,9 +1435,7 @@ function AlbumDetail({
       >
         {coverSrc ? (
           <Image
-            src={
-              coverSrc
-            }
+            src={coverSrc}
             alt={
               album.title
             }
@@ -1261,9 +1566,7 @@ function AlbumDetail({
         </div>
       </div>
 
-      {/* =================================================
-          INFORMATION
-      ================================================= */}
+      {/* INFORMATION */}
 
       <div
         style={{
@@ -1336,9 +1639,7 @@ function AlbumDetail({
           </button>
         </div>
 
-        {/* =================================================
-            MEDIA
-        ================================================= */}
+        {/* MEDIA */}
 
         <div
           style={{
@@ -1376,8 +1677,8 @@ function AlbumDetail({
             <button
               type="button"
               onClick={() =>
-                alert(
-                  "Adding media will be connected next."
+                onEditAlbum(
+                  album
                 )
               }
               style={
@@ -1459,11 +1760,6 @@ function AlbumDetail({
                         cursor:
                           "pointer",
                       }}
-                      aria-label={
-                        isVideo
-                          ? `Open video ${index + 1}`
-                          : `Open photo ${index + 1}`
-                      }
                     >
                       {isVideo ? (
                         <>
@@ -1517,10 +1813,6 @@ function AlbumDetail({
                                   "rgba(255,255,255,.80)",
                                 color:
                                   "#456C57",
-                                backdropFilter:
-                                  "blur(10px)",
-                                WebkitBackdropFilter:
-                                  "blur(10px)",
                               }}
                             >
                               <Play
@@ -1585,20 +1877,494 @@ function AlbumModal({
   onChange,
   onClose,
   onSave,
+  onAlbumUpdated,
 }: {
   editingAlbum:
     | SerializableAlbum
     | null;
+
   form: AlbumFormData;
+
   saving: boolean;
+
   error: string;
+
   onChange: (
     field: keyof AlbumFormData,
     value: string
   ) => void;
+
   onClose: () => void;
-  onSave: () => void;
+
+  onSave: (
+    coverFile: File | null,
+    pendingMedia: PendingMedia[]
+  ) => Promise<void>;
+
+  onAlbumUpdated: (
+    album: SerializableAlbum
+  ) => void;
 }) {
+  const coverInputRef =
+    useRef<HTMLInputElement | null>(
+      null
+    );
+
+  const mediaInputRef =
+    useRef<HTMLInputElement | null>(
+      null
+    );
+
+  const [
+    coverFile,
+    setCoverFile,
+  ] = useState<File | null>(
+    null
+  );
+
+  const [
+    coverPreview,
+    setCoverPreview,
+  ] = useState("");
+
+  const [
+    pendingMedia,
+    setPendingMedia,
+  ] = useState<
+    PendingMedia[]
+  >([]);
+
+  const [
+    mediaUploading,
+    setMediaUploading,
+  ] = useState(false);
+
+  const [
+    mediaError,
+    setMediaError,
+  ] = useState("");
+
+  const [
+    deletingMediaId,
+    setDeletingMediaId,
+  ] = useState<string | null>(
+    null
+  );
+
+  const currentMedia =
+    editingAlbum
+      ? getMediaItems(
+          editingAlbum
+        ).filter(
+          (media) =>
+            !(
+              editingAlbum.coverFileId &&
+              media.id ===
+                editingAlbum.coverFileId
+            )
+        )
+      : [];
+
+  /*
+   * -------------------------------------------------------
+   * COVER PREVIEW
+   * -------------------------------------------------------
+   */
+
+  function handleCoverChange(
+    event: React.ChangeEvent<HTMLInputElement>
+  ) {
+    const file =
+      event.target.files?.[0];
+
+    event.target.value = "";
+
+    if (!file) {
+      return;
+    }
+
+    if (
+      !file.type.startsWith(
+        "image/"
+      )
+    ) {
+      setMediaError(
+        "The album cover must be an image file."
+      );
+      return;
+    }
+
+    setMediaError("");
+
+    if (coverPreview) {
+      URL.revokeObjectURL(
+        coverPreview
+      );
+    }
+
+    const preview =
+      URL.createObjectURL(file);
+
+    setCoverFile(file);
+    setCoverPreview(preview);
+  }
+
+  /*
+   * -------------------------------------------------------
+   * MEDIA SELECTION
+   * -------------------------------------------------------
+   */
+
+  function handleMediaSelection(
+    event: React.ChangeEvent<HTMLInputElement>
+  ) {
+    const files =
+      Array.from(
+        event.target.files ??
+          []
+      );
+
+    event.target.value = "";
+
+    if (!files.length) {
+      return;
+    }
+
+    const invalid =
+      files.find(
+        (file) =>
+          !file.type.startsWith(
+            "image/"
+          ) &&
+          !file.type.startsWith(
+            "video/"
+          )
+      );
+
+    if (invalid) {
+      setMediaError(
+        `"${invalid.name}" is not a supported image or video file.`
+      );
+      return;
+    }
+
+    setMediaError("");
+
+    const newFiles =
+      files.map(
+        (file) => ({
+          id:
+            crypto.randomUUID(),
+          file,
+          previewUrl:
+            URL.createObjectURL(
+              file
+            ),
+        })
+      );
+
+    setPendingMedia(
+      (current) => [
+        ...current,
+        ...newFiles,
+      ]
+    );
+  }
+
+  function removePendingMedia(
+    id: string
+  ) {
+    setPendingMedia(
+      (current) => {
+        const target =
+          current.find(
+            (item) =>
+              item.id === id
+          );
+
+        if (target) {
+          URL.revokeObjectURL(
+            target.previewUrl
+          );
+        }
+
+        return current.filter(
+          (item) =>
+            item.id !== id
+        );
+      }
+    );
+  }
+
+  /*
+   * -------------------------------------------------------
+   * IMMEDIATE MEDIA UPLOAD FOR EXISTING ALBUM
+   * -------------------------------------------------------
+   */
+
+  async function uploadMediaNow(
+    files: PendingMedia[]
+  ) {
+    if (!editingAlbum) {
+      return;
+    }
+
+    setMediaUploading(true);
+    setMediaError("");
+
+    try {
+      let album =
+        editingAlbum;
+
+      for (
+        let index = 0;
+        index < files.length;
+        index++
+      ) {
+        const pending =
+          files[index];
+
+        const formData =
+          new FormData();
+
+        formData.append(
+          "file",
+          pending.file
+        );
+
+        formData.append(
+          "type",
+          "media"
+        );
+
+        const response =
+          await fetch(
+            `/api/memories/albums/${encodeURIComponent(
+              album.id
+            )}/upload`,
+            {
+              method: "POST",
+              body: formData,
+            }
+          );
+
+        const data =
+          await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data.error ??
+              `Failed to upload ${pending.file.name}.`
+          );
+        }
+
+        if (data.album) {
+          album = {
+            ...album,
+            ...data.album,
+            createdAt:
+              album.createdAt,
+          };
+
+          onAlbumUpdated(
+            album
+          );
+        }
+      }
+
+      files.forEach(
+        (file) => {
+          URL.revokeObjectURL(
+            file.previewUrl
+          );
+        }
+      );
+
+      setPendingMedia(
+        (current) =>
+          current.filter(
+            (item) =>
+              !files.some(
+                (file) =>
+                  file.id ===
+                  item.id
+              )
+          )
+      );
+    } catch (error) {
+      console.error(
+        "Media upload error:",
+        error
+      );
+
+      setMediaError(
+        error instanceof Error
+          ? error.message
+          : "Failed to upload media."
+      );
+    } finally {
+      setMediaUploading(false);
+    }
+  }
+
+  /*
+   * -------------------------------------------------------
+   * DELETE EXISTING MEDIA
+   * -------------------------------------------------------
+   */
+
+  async function deleteExistingMedia(
+    media: DisplayMedia
+  ) {
+    if (!editingAlbum) {
+      return;
+    }
+
+    const confirmed =
+      window.confirm(
+        `Delete "${media.name}"?\n\nThis will permanently remove the file from this album.`
+      );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingMediaId(
+      media.id
+    );
+    setMediaError("");
+
+    try {
+      const response =
+        await fetch(
+          `/api/memories/albums/${encodeURIComponent(
+            editingAlbum.id
+          )}/media/${encodeURIComponent(
+            media.id
+          )}`,
+          {
+            method: "DELETE",
+          }
+        );
+
+      const data =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ??
+            "Failed to delete media."
+        );
+      }
+
+      const updatedMediaFileIds =
+        (
+          editingAlbum.mediaFileIds ??
+          []
+        ).filter(
+          (id) =>
+            id !== media.id
+        );
+
+      const updatedMediaFiles =
+        (
+          editingAlbum.mediaFiles ??
+          []
+        ).filter(
+          (file) =>
+            file.id !==
+            media.id
+        );
+
+      const mediaIndex =
+        (
+          editingAlbum.mediaFileIds ??
+          []
+        ).indexOf(
+          media.id
+        );
+
+      const updatedLegacyMedia =
+        (
+          editingAlbum.media ??
+          []
+        ).filter(
+          (_url, index) =>
+            index !==
+            mediaIndex
+        );
+
+      const updatedAlbum: SerializableAlbum =
+        {
+          ...editingAlbum,
+          mediaFileIds:
+            updatedMediaFileIds,
+          mediaFiles:
+            updatedMediaFiles,
+          media:
+            updatedLegacyMedia,
+        };
+
+      onAlbumUpdated(
+        updatedAlbum
+      );
+    } catch (error) {
+      console.error(
+        "Delete media error:",
+        error
+      );
+
+      setMediaError(
+        error instanceof Error
+          ? error.message
+          : "Failed to delete media."
+      );
+    } finally {
+      setDeletingMediaId(
+        null
+      );
+    }
+  }
+
+  /*
+   * -------------------------------------------------------
+   * SAVE
+   * -------------------------------------------------------
+   */
+
+  async function handleSubmit() {
+    await onSave(
+      coverFile,
+      pendingMedia
+    );
+
+    if (coverPreview) {
+      URL.revokeObjectURL(
+        coverPreview
+      );
+    }
+
+    setCoverPreview("");
+    setCoverFile(null);
+  }
+
+  /*
+   * -------------------------------------------------------
+   * COVER PREVIEW SOURCE
+   * -------------------------------------------------------
+   */
+
+  const existingCover =
+    editingAlbum
+      ? getCoverSrc(
+          editingAlbum
+        )
+      : "";
+
+  const displayedCover =
+    coverPreview ||
+    existingCover;
+
   return (
     <div
       role="dialog"
@@ -1646,9 +2412,7 @@ function AlbumModal({
           padding: 26,
         }}
       >
-        {/* =================================================
-            MODAL HEADER
-        ================================================= */}
+        {/* HEADER */}
 
         <div
           style={{
@@ -1714,9 +2478,7 @@ function AlbumModal({
 
           <button
             type="button"
-            onClick={
-              onClose
-            }
+            onClick={onClose}
             disabled={saving}
             aria-label="Close album form"
             style={{
@@ -1748,9 +2510,7 @@ function AlbumModal({
           </button>
         </div>
 
-        {/* =================================================
-            FORM
-        ================================================= */}
+        {/* FORM */}
 
         <div
           style={{
@@ -1790,7 +2550,6 @@ function AlbumModal({
           >
             <FormField
               label="Date"
-              type="text"
               value={
                 form.date
               }
@@ -1856,6 +2615,10 @@ function AlbumModal({
             />
           </div>
 
+          {/* =================================================
+              COVER
+          ================================================= */}
+
           <div
             style={{
               height: 1,
@@ -1878,79 +2641,574 @@ function AlbumModal({
               fontWeight: 700,
             }}
           >
-            Media Configuration
+            Album Cover
           </div>
 
-          <FormField
-            label="Cover File ID"
-            value={
-              form.coverFileId
+          <input
+            ref={
+              coverInputRef
             }
-            placeholder="Google Drive file ID"
-            onChange={(
-              value
-            ) =>
-              onChange(
-                "coverFileId",
-                value
-              )
+            type="file"
+            accept="image/*"
+            onChange={
+              handleCoverChange
             }
-          />
-
-          <FormField
-            label="Cover URL"
-            value={
-              form.coverUrl
-            }
-            placeholder="Optional legacy cover URL"
-            onChange={(
-              value
-            ) =>
-              onChange(
-                "coverUrl",
-                value
-              )
-            }
-          />
-
-          <FormField
-            label="Google Drive Folder ID"
-            required
-            value={
-              form.driveFolderId
-            }
-            placeholder="Google Drive folder ID"
-            onChange={(
-              value
-            ) =>
-              onChange(
-                "driveFolderId",
-                value
-              )
-            }
+            style={{
+              display:
+                "none",
+            }}
           />
 
           <div
             style={{
-              padding:
-                "11px 13px",
-              borderRadius:
-                13,
+              width:
+                "100%",
+              aspectRatio:
+                "16 / 9",
+              overflow:
+                "hidden",
+              borderRadius: 18,
               background:
-                "rgba(69,108,87,.055)",
-              color:
-                "#718077",
-              fontSize: 11,
-              lineHeight: 1.55,
+                "rgba(69,108,87,.07)",
             }}
           >
-            The Drive folder ID is used
-            to associate this album with
-            its Google Drive media.
-            Media uploading can be
-            connected separately without
-            creating another page.
+            {displayedCover ? (
+              <Image
+                src={
+                  displayedCover
+                }
+                alt={
+                  form.title ||
+                  "Album cover"
+                }
+                width={900}
+                height={500}
+                style={{
+                  width:
+                    "100%",
+                  height:
+                    "100%",
+                  objectFit:
+                    "cover",
+                }}
+                unoptimized
+              />
+            ) : (
+              <div
+                style={{
+                  width:
+                    "100%",
+                  height:
+                    "100%",
+                  display:
+                    "flex",
+                  alignItems:
+                    "center",
+                  justifyContent:
+                    "center",
+                  color:
+                    "#8A968C",
+                  fontSize: 13,
+                }}
+              >
+                No cover image
+              </div>
+            )}
           </div>
+
+          <button
+            type="button"
+            onClick={() =>
+              coverInputRef.current?.click()
+            }
+            disabled={saving}
+            style={{
+              ...secondaryButtonStyle,
+              width:
+                "100%",
+              display:
+                "flex",
+              alignItems:
+                "center",
+              justifyContent:
+                "center",
+              gap: 7,
+            }}
+          >
+            <ImagePlus
+              size={16}
+            />
+
+            {coverFile
+              ? "Change Selected Cover"
+              : "Change Cover"}
+          </button>
+
+          {/* =================================================
+              MEDIA
+          ================================================= */}
+
+          <div
+            style={{
+              height: 1,
+              background:
+                "rgba(69,108,87,.10)",
+              margin:
+                "3px 0",
+            }}
+          />
+
+          <div
+            style={{
+              display:
+                "flex",
+              alignItems:
+                "center",
+              justifyContent:
+                "space-between",
+              gap: 10,
+            }}
+          >
+            <div>
+              <div
+                style={{
+                  fontSize: 11,
+                  letterSpacing:
+                    1.3,
+                  textTransform:
+                    "uppercase",
+                  color:
+                    "#456C57",
+                  fontWeight: 700,
+                }}
+              >
+                Photos & Videos
+              </div>
+
+              <p
+                style={{
+                  margin:
+                    "5px 0 0",
+                  color:
+                    "#82968D",
+                  fontSize: 11,
+                }}
+              >
+                Add or remove media
+                from this album.
+              </p>
+            </div>
+
+            <input
+              ref={
+                mediaInputRef
+              }
+              type="file"
+              accept="image/*,video/*"
+              multiple
+              onChange={
+                handleMediaSelection
+              }
+              style={{
+                display:
+                  "none",
+              }}
+            />
+
+            <button
+              type="button"
+              onClick={() =>
+                mediaInputRef.current?.click()
+              }
+              disabled={
+                saving ||
+                mediaUploading
+              }
+              style={
+                smallButtonStyle
+              }
+            >
+              <Upload
+                size={15}
+              />
+
+              Add Media
+            </button>
+          </div>
+
+          {/* EXISTING MEDIA */}
+
+          {currentMedia.length >
+            0 && (
+            <div
+              style={{
+                display:
+                  "grid",
+                gridTemplateColumns:
+                  "repeat(3, minmax(0, 1fr))",
+                gap: 9,
+              }}
+            >
+              {currentMedia.map(
+                (
+                  media
+                ) => {
+                  const video =
+                    isVideoMimeType(
+                      media.mimeType
+                    );
+
+                  return (
+                    <div
+                      key={
+                        media.id
+                      }
+                      style={{
+                        position:
+                          "relative",
+                        aspectRatio:
+                          "1 / 1",
+                        overflow:
+                          "hidden",
+                        borderRadius:
+                          14,
+                        background:
+                          "rgba(69,108,87,.08)",
+                      }}
+                    >
+                      {video ? (
+                        <>
+                          <video
+                            src={
+                              media.src
+                            }
+                            muted
+                            playsInline
+                            preload="metadata"
+                            style={{
+                              width:
+                                "100%",
+                              height:
+                                "100%",
+                              objectFit:
+                                "cover",
+                            }}
+                          />
+
+                          <div
+                            style={{
+                              position:
+                                "absolute",
+                              inset: 0,
+                              display:
+                                "flex",
+                              alignItems:
+                                "center",
+                              justifyContent:
+                                "center",
+                              pointerEvents:
+                                "none",
+                            }}
+                          >
+                            <div
+                              style={{
+                                width: 34,
+                                height: 34,
+                                borderRadius:
+                                  "50%",
+                                background:
+                                  "rgba(255,255,255,.82)",
+                                display:
+                                  "flex",
+                                alignItems:
+                                  "center",
+                                justifyContent:
+                                  "center",
+                                color:
+                                  "#456C57",
+                              }}
+                            >
+                              <Play
+                                size={
+                                  15
+                                }
+                                fill="currentColor"
+                              />
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <Image
+                          src={
+                            media.src
+                          }
+                          alt={
+                            media.name
+                          }
+                          fill
+                          sizes="180px"
+                          style={{
+                            objectFit:
+                              "cover",
+                          }}
+                          unoptimized
+                        />
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void deleteExistingMedia(
+                            media
+                          )
+                        }
+                        disabled={
+                          deletingMediaId ===
+                          media.id
+                        }
+                        aria-label={`Delete ${media.name}`}
+                        style={{
+                          position:
+                            "absolute",
+                          top: 7,
+                          right: 7,
+                          width: 28,
+                          height: 28,
+                          border:
+                            "none",
+                          borderRadius:
+                            9,
+                          background:
+                            "rgba(255,255,255,.88)",
+                          color:
+                            "#A35B5B",
+                          display:
+                            "flex",
+                          alignItems:
+                            "center",
+                          justifyContent:
+                            "center",
+                          cursor:
+                            "pointer",
+                        }}
+                      >
+                        {deletingMediaId ===
+                        media.id ? (
+                          <Loader2
+                            size={
+                              13
+                            }
+                            className="spin"
+                          />
+                        ) : (
+                          <Trash2
+                            size={
+                              13
+                            }
+                          />
+                        )}
+                      </button>
+                    </div>
+                  );
+                }
+              )}
+            </div>
+          )}
+
+          {/* PENDING MEDIA */}
+
+          {pendingMedia.length >
+            0 && (
+            <div>
+              <div
+                style={{
+                  marginBottom: 8,
+                  color:
+                    "#7A887C",
+                  fontSize: 11,
+                  fontWeight: 700,
+                }}
+              >
+                Ready to upload
+              </div>
+
+              <div
+                style={{
+                  display:
+                    "grid",
+                  gridTemplateColumns:
+                    "repeat(3, minmax(0, 1fr))",
+                  gap: 9,
+                }}
+              >
+                {pendingMedia.map(
+                  (
+                    media
+                  ) => {
+                    const video =
+                      media.file.type.startsWith(
+                        "video/"
+                      );
+
+                    return (
+                      <div
+                        key={
+                          media.id
+                        }
+                        style={{
+                          position:
+                            "relative",
+                          aspectRatio:
+                            "1 / 1",
+                          overflow:
+                            "hidden",
+                          borderRadius:
+                            14,
+                          background:
+                            "rgba(69,108,87,.08)",
+                        }}
+                      >
+                        {video ? (
+                          <video
+                            src={
+                              media.previewUrl
+                            }
+                            muted
+                            playsInline
+                            style={{
+                              width:
+                                "100%",
+                              height:
+                                "100%",
+                              objectFit:
+                                "cover",
+                            }}
+                          />
+                        ) : (
+                          <Image
+                            src={
+                              media.previewUrl
+                            }
+                            alt={
+                              media.file.name
+                            }
+                            fill
+                            sizes="180px"
+                            style={{
+                              objectFit:
+                                "cover",
+                            }}
+                            unoptimized
+                          />
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            removePendingMedia(
+                              media.id
+                            )
+                          }
+                          style={{
+                            position:
+                              "absolute",
+                            top: 7,
+                            right: 7,
+                            width: 28,
+                            height: 28,
+                            border:
+                              "none",
+                            borderRadius:
+                              9,
+                            background:
+                              "rgba(255,255,255,.88)",
+                            color:
+                              "#A35B5B",
+                            display:
+                              "flex",
+                            alignItems:
+                              "center",
+                            justifyContent:
+                              "center",
+                            cursor:
+                              "pointer",
+                          }}
+                        >
+                          <Trash2
+                            size={
+                              13
+                            }
+                          />
+                        </button>
+                      </div>
+                    );
+                  }
+                )}
+              </div>
+
+              {editingAlbum && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    void uploadMediaNow(
+                      pendingMedia
+                    )
+                  }
+                  disabled={
+                    mediaUploading
+                  }
+                  style={{
+                    ...primaryButtonStyle,
+                    width:
+                      "100%",
+                    marginTop: 10,
+                    opacity:
+                      mediaUploading
+                        ? 0.7
+                        : 1,
+                  }}
+                >
+                  {mediaUploading ? (
+                    <>
+                      <Loader2
+                        size={16}
+                        className="spin"
+                      />
+                      Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <Upload
+                        size={16}
+                      />
+                      Upload Selected Media
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+          )}
+
+          {mediaError && (
+            <div
+              style={{
+                padding:
+                  "11px 13px",
+                borderRadius:
+                  13,
+                background:
+                  "rgba(180,60,60,.08)",
+                border:
+                  "1px solid rgba(180,60,60,.12)",
+                color:
+                  "#9B4C4C",
+                fontSize: 12,
+                lineHeight: 1.5,
+              }}
+            >
+              {mediaError}
+            </div>
+          )}
 
           {error && (
             <div
@@ -1974,9 +3232,7 @@ function AlbumModal({
           )}
         </div>
 
-        {/* =================================================
-            ACTIONS
-        ================================================= */}
+        {/* ACTIONS */}
 
         <div
           style={{
@@ -2004,14 +3260,20 @@ function AlbumModal({
           <button
             type="button"
             onClick={
-              onSave
+              handleSubmit
             }
-            disabled={saving}
+            disabled={
+              saving ||
+              mediaUploading
+            }
             style={{
               ...primaryButtonStyle,
               minWidth: 125,
               opacity:
-                saving ? 0.7 : 1,
+                saving ||
+                mediaUploading
+                  ? 0.7
+                  : 1,
             }}
           >
             {saving ? (
@@ -2027,6 +3289,7 @@ function AlbumModal({
                 <FolderHeart
                   size={16}
                 />
+
                 {editingAlbum
                   ? "Save Changes"
                   : "Create Album"}
@@ -2070,14 +3333,12 @@ function FormField({
   value,
   placeholder,
   required = false,
-  type = "text",
   onChange,
 }: {
   label: string;
   value: string;
   placeholder?: string;
   required?: boolean;
-  type?: string;
   onChange: (
     value: string
   ) => void;
@@ -2105,7 +3366,7 @@ function FormField({
       </label>
 
       <input
-        type={type}
+        type="text"
         value={value}
         placeholder={
           placeholder
@@ -2114,8 +3375,7 @@ function FormField({
           event
         ) =>
           onChange(
-            event.target
-              .value
+            event.target.value
           )
         }
         style={
@@ -2535,7 +3795,8 @@ const iconButtonStyle: React.CSSProperties =
       "rgba(69,108,87,.07)",
     color: "#456C57",
     display: "flex",
-    alignItems: "center",
+    alignItems:
+      "center",
     justifyContent:
       "center",
     cursor: "pointer",
