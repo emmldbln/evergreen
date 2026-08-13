@@ -1,17 +1,132 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   UserRound,
   Images,
   Music2,
   ChevronRight,
-  Wrench,
+  Check,
+  Eye,
+  Sparkles,
+  Accessibility,
+  Shield,
 } from "lucide-react";
 
 import GlassCard from "@/app/components/ui/GlassCard";
 
+import {
+  DEFAULT_PROFILE,
+  getProfile,
+  saveProfile,
+  getExperience,
+  saveExperience,
+  type ExperienceSettings,
+} from "@/lib/profile";
+
 export default function SettingsPage() {
+  /* =======================================================
+     PROFILE
+  ======================================================= */
+
+  const [displayName, setDisplayName] = useState(
+    DEFAULT_PROFILE.displayName
+  );
+
+  const [saved, setSaved] = useState(false);
+
+  /* =======================================================
+     EXPERIENCE
+  ======================================================= */
+
+  const [experience, setExperience] =
+    useState<ExperienceSettings>(() =>
+      getExperience()
+    );
+
+  /* =======================================================
+     SECRET ADMIN
+  ======================================================= */
+
+  const [secretTapCount, setSecretTapCount] =
+    useState(0);
+
+  /* =======================================================
+     LOAD SAVED SETTINGS
+  ======================================================= */
+
+  useEffect(() => {
+    const profile = getProfile();
+    const experienceSettings = getExperience();
+
+    setDisplayName(profile.displayName);
+    setExperience(experienceSettings);
+  }, []);
+
+  /* =======================================================
+     SAVE PROFILE
+  ======================================================= */
+
+  function handleSaveProfile() {
+    const trimmedName = displayName.trim();
+
+    if (!trimmedName) {
+      return;
+    }
+
+    saveProfile({
+      displayName: trimmedName,
+    });
+
+    setDisplayName(trimmedName);
+    setSaved(true);
+
+    window.setTimeout(() => {
+      setSaved(false);
+    }, 2000);
+  }
+
+  /* =======================================================
+     EXPERIENCE TOGGLE
+  ======================================================= */
+
+  function toggleExperience(
+    key: keyof ExperienceSettings
+  ) {
+    setExperience((current) => {
+      const updated: ExperienceSettings = {
+        ...current,
+        [key]: !current[key],
+      };
+
+      saveExperience(updated);
+
+      return updated;
+    });
+  }
+
+  /* =======================================================
+     SECRET ADMIN GESTURE
+  ======================================================= */
+
+  function handleSecretAdminTap() {
+    setSecretTapCount((current) => {
+      const next = current + 1;
+
+      if (next >= 5) {
+        window.location.href = "/admin";
+        return 0;
+      }
+
+      return next;
+    });
+
+    window.setTimeout(() => {
+      setSecretTapCount(0);
+    }, 1800);
+  }
+
   return (
     <main
       style={{
@@ -22,34 +137,51 @@ export default function SettingsPage() {
     >
       <div
         style={{
-          maxWidth: 1200,
+          width: "100%",
+          maxWidth: 1280,
           margin: "0 auto",
         }}
       >
-        {/* HEADER */}
+        {/* =================================================
+            HEADER
+        ================================================= */}
+
         <header
           style={{
-            marginBottom: 36,
+            marginBottom: 34,
           }}
         >
-          <div
+          <button
+            type="button"
+            onClick={handleSecretAdminTap}
             style={{
+              appearance: "none",
+              border: "none",
+              background: "transparent",
+              padding: 0,
+              margin: 0,
+
               fontSize: 13,
               letterSpacing: 2,
               textTransform: "uppercase",
+
               color: "#456C57",
               fontWeight: 700,
-              marginBottom: 10,
+
+              cursor: "default",
             }}
+            aria-label="Evergreen"
           >
             Evergreen
-          </div>
+          </button>
 
           <h1
             style={{
-              margin: 0,
-              fontSize: 52,
+              margin: "8px 0 0",
+              fontSize: "clamp(42px, 5vw, 56px)",
               fontFamily: "var(--font-serif)",
+              fontWeight: 500,
+              lineHeight: 1.05,
             }}
           >
             Settings
@@ -57,9 +189,10 @@ export default function SettingsPage() {
 
           <p
             style={{
-              marginTop: 8,
+              marginTop: 10,
               marginBottom: 0,
               fontSize: 17,
+              lineHeight: 1.6,
               color: "#7A887C",
             }}
           >
@@ -67,78 +200,478 @@ export default function SettingsPage() {
           </p>
         </header>
 
-        {/* THREE SETTINGS PANES */}
+        {/* =================================================
+            THREE PANES
+        ================================================= */}
+
         <div
+          className="evergreen-settings-grid"
           style={{
             display: "grid",
             gridTemplateColumns:
-              "repeat(auto-fit, minmax(280px, 1fr))",
+              "repeat(3, minmax(0, 1fr))",
             gap: 22,
+            alignItems: "stretch",
           }}
         >
-          {/* PROFILE */}
+          {/* =================================================
+              MEMORIES
+          ================================================= */}
+
           <GlassCard>
-            <SettingIcon>
-              <UserRound size={24} strokeWidth={1.8} />
-            </SettingIcon>
-
-            <SettingContent
-              title="Profile"
-              description="Your displayed name and personal settings."
-            />
-
-            <Link
-              href="/settings/profile"
-              style={linkStyle}
+            <div
+              style={{
+                minHeight: 640,
+                display: "flex",
+                flexDirection: "column",
+                padding: 28,
+                boxSizing: "border-box",
+              }}
             >
-              <span>Your Profile</span>
-              <ChevronRight size={18} />
-            </Link>
+              <PaneIcon>
+                <Images
+                  size={25}
+                  strokeWidth={1.7}
+                />
+              </PaneIcon>
+
+              <div>
+                <PaneEyebrow>
+                  Memories
+                </PaneEyebrow>
+
+                <h2 style={paneTitleStyle}>
+                  Your Memories
+                </h2>
+
+                <p style={descriptionStyle}>
+                  Keep the moments that matter most
+                  in one beautiful place.
+                </p>
+              </div>
+
+              <div
+                style={{
+                  marginTop: 34,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 12,
+                }}
+              >
+                <InfoRow
+                  label="Albums"
+                  description="Organize your memories"
+                />
+
+                <InfoRow
+                  label="Photos & Videos"
+                  description="Keep your favorite moments"
+                />
+
+                <InfoRow
+                  label="Stories"
+                  description="Add captions and dates"
+                />
+              </div>
+
+              <div
+                style={{
+                  flex: 1,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: "30px 0",
+                }}
+              >
+                <div
+                  style={{
+                    width: 150,
+                    height: 150,
+                    borderRadius: "50%",
+                    background:
+                      "radial-gradient(circle, rgba(69,108,87,.13), rgba(69,108,87,0))",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color:
+                      "rgba(69,108,87,.35)",
+                  }}
+                >
+                  <Images size={54} />
+                </div>
+              </div>
+
+              <Link
+                href="/settings/memories"
+                style={largeLinkStyle}
+              >
+                <span>Open Memories</span>
+                <ChevronRight size={20} />
+              </Link>
+            </div>
           </GlassCard>
 
-          {/* MEMORIES */}
+          {/* =================================================
+              SOUNDTRACK
+          ================================================= */}
+
           <GlassCard>
-            <SettingIcon>
-              <Images size={24} strokeWidth={1.8} />
-            </SettingIcon>
-
-            <SettingContent
-              title="Memories"
-              description="Your albums, photos, videos, captions, and dates."
-            />
-
-            <Link
-              href="/settings/memories"
-              style={linkStyle}
+            <div
+              style={{
+                minHeight: 640,
+                display: "flex",
+                flexDirection: "column",
+                padding: 28,
+                boxSizing: "border-box",
+              }}
             >
-              <span>Your Memories</span>
-              <ChevronRight size={18} />
-            </Link>
+              <PaneIcon>
+                <Music2
+                  size={25}
+                  strokeWidth={1.7}
+                />
+              </PaneIcon>
+
+              <div>
+                <PaneEyebrow>
+                  Soundtrack
+                </PaneEyebrow>
+
+                <h2 style={paneTitleStyle}>
+                  Our Soundtrack
+                </h2>
+
+                <p style={descriptionStyle}>
+                  Give your memories a soundtrack
+                  of their own.
+                </p>
+              </div>
+
+              <div
+                style={{
+                  flex: 1,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: "28px 0",
+                }}
+              >
+                <div
+                  style={{
+                    width: 190,
+                    height: 190,
+                    borderRadius: 32,
+                    background:
+                      "linear-gradient(135deg, #456C57, #6D8B77)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "white",
+                    boxShadow:
+                      "0 24px 60px rgba(69,108,87,.25)",
+                    animation:
+                      "evergreenFloat 5s ease-in-out infinite",
+                  }}
+                >
+                  <Music2 size={76} />
+                </div>
+              </div>
+
+              <div
+                style={{
+                  padding: "18px 0",
+                  borderTop:
+                    "1px solid rgba(0,0,0,.07)",
+                  borderBottom:
+                    "1px solid rgba(0,0,0,.07)",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 11,
+                    letterSpacing: 1.5,
+                    textTransform: "uppercase",
+                    fontWeight: 700,
+                    color: "#456C57",
+                  }}
+                >
+                  Personalized Music
+                </div>
+
+                <p
+                  style={{
+                    margin: "8px 0 0",
+                    fontSize: 14,
+                    lineHeight: 1.6,
+                    color: "#7A887C",
+                  }}
+                >
+                  Connect Spotify songs to your
+                  memories.
+                </p>
+              </div>
+
+              <Link
+                href="/soundtrack"
+                style={{
+                  ...largeLinkStyle,
+                  marginTop: 18,
+                }}
+              >
+                <span>Open Soundtrack</span>
+                <ChevronRight size={20} />
+              </Link>
+            </div>
           </GlassCard>
 
-          {/* SOUNDTRACK */}
+          {/* =================================================
+              PROFILE
+          ================================================= */}
+
           <GlassCard>
-            <SettingIcon>
-              <Music2 size={24} strokeWidth={1.8} />
-            </SettingIcon>
+            <div
+              style={{
+                minHeight: 640,
+                display: "flex",
+                flexDirection: "column",
+                padding: 28,
+                boxSizing: "border-box",
+              }}
+            >
+              <PaneIcon>
+                <UserRound
+                  size={25}
+                  strokeWidth={1.7}
+                />
+              </PaneIcon>
 
-            <SettingContent
-              title="Soundtrack"
-              description="Music controls are still being developed."
-            />
+              <div>
+                <PaneEyebrow>
+                  Profile
+                </PaneEyebrow>
 
-            <div style={statusStyle}>
-              <Wrench size={16} />
-              <span>Still in development</span>
+                <h2 style={paneTitleStyle}>
+                  Your Space
+                </h2>
+
+                <p style={descriptionStyle}>
+                  Personalize how Evergreen feels
+                  and addresses you.
+                </p>
+              </div>
+
+              {/* DISPLAY NAME */}
+
+              <section
+                style={{
+                  marginTop: 32,
+                }}
+              >
+                <SectionLabel>
+                  Display Name
+                </SectionLabel>
+
+                <input
+                  value={displayName}
+                  onChange={(event) => {
+                    setDisplayName(
+                      event.target.value
+                    );
+                    setSaved(false);
+                  }}
+                  placeholder="Enter a name"
+                  autoComplete="off"
+                  style={{
+                    width: "100%",
+                    boxSizing: "border-box",
+                    marginTop: 10,
+                    border:
+                      "1px solid rgba(69,108,87,.18)",
+                    borderRadius: 16,
+                    padding: "14px 15px",
+                    background:
+                      "rgba(255,255,255,.48)",
+                    color: "#3F5345",
+                    fontSize: 15,
+                    outline: "none",
+                  }}
+                />
+              </section>
+
+              {/* EXPERIENCE */}
+
+              <section
+                style={{
+                  marginTop: 30,
+                }}
+              >
+                <SectionLabel>
+                  Experience
+                </SectionLabel>
+
+                <div
+                  style={{
+                    marginTop: 10,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 8,
+                  }}
+                >
+                  <ToggleRow
+                    icon={<Eye size={17} />}
+                    title="Falling Leaves"
+                    description="Floating leaves in the background"
+                    enabled={
+                      experience.fallingLeaves
+                    }
+                    onToggle={() =>
+                      toggleExperience(
+                        "fallingLeaves"
+                      )
+                    }
+                  />
+
+                  <ToggleRow
+                    icon={
+                      <Sparkles size={17} />
+                    }
+                    title="Floating Particles"
+                    description="Soft ambient particles"
+                    enabled={
+                      experience.floatingParticles
+                    }
+                    onToggle={() =>
+                      toggleExperience(
+                        "floatingParticles"
+                      )
+                    }
+                  />
+
+                  <ToggleRow
+                    icon={
+                      <Accessibility size={17} />
+                    }
+                    title="Reduced Motion"
+                    description="Reduce background animations"
+                    enabled={
+                      experience.reducedMotion
+                    }
+                    onToggle={() =>
+                      toggleExperience(
+                        "reducedMotion"
+                      )
+                    }
+                  />
+                </div>
+              </section>
+
+              {/* SAVE */}
+
+              <div
+                style={{
+                  marginTop: "auto",
+                  paddingTop: 28,
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={handleSaveProfile}
+                  disabled={!displayName.trim()}
+                  style={{
+                    width: "100%",
+                    border: "none",
+                    borderRadius: 16,
+                    padding: "14px 18px",
+                    background: displayName.trim()
+                      ? "#456C57"
+                      : "rgba(69,108,87,.25)",
+                    color: "white",
+                    fontSize: 14,
+                    fontWeight: 700,
+                    cursor: displayName.trim()
+                      ? "pointer"
+                      : "not-allowed",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 8,
+                    transition: ".25s ease",
+                  }}
+                >
+                  {saved ? (
+                    <>
+                      <Check size={18} />
+                      Saved
+                    </>
+                  ) : (
+                    "Save Changes"
+                  )}
+                </button>
+
+                <p
+                  style={{
+                    margin: "10px 0 0",
+                    textAlign: "center",
+                    color: "#8A968C",
+                    fontSize: 12,
+                  }}
+                >
+                  Saved on this device
+                </p>
+              </div>
+
+              {/* SECRET ADMIN */}
+
+              <div
+                style={{
+                  marginTop: 24,
+                  paddingTop: 18,
+                  borderTop:
+                    "1px solid rgba(0,0,0,.06)",
+                  textAlign: "center",
+                  color:
+                    "rgba(69,108,87,.42)",
+                  fontSize: 11,
+                }}
+              >
+                <Shield
+                  size={13}
+                  style={{
+                    verticalAlign: "middle",
+                    marginRight: 5,
+                  }}
+                />
+
+                Personal settings
+              </div>
             </div>
           </GlassCard>
         </div>
       </div>
+
+      <style jsx>{`
+        @media (max-width: 900px) {
+          .evergreen-settings-grid {
+            grid-template-columns: 1fr !important;
+          }
+        }
+
+        @media (max-width: 600px) {
+          main {
+            padding-left: 16px !important;
+            padding-right: 16px !important;
+          }
+        }
+      `}</style>
     </main>
   );
 }
 
-function SettingIcon({
+/* =========================================================
+   COMPONENTS
+========================================================= */
+
+function PaneIcon({
   children,
 }: {
   children: React.ReactNode;
@@ -146,15 +679,16 @@ function SettingIcon({
   return (
     <div
       style={{
-        width: 52,
-        height: 52,
-        borderRadius: 17,
+        width: 54,
+        height: 54,
+        borderRadius: 18,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "rgba(69,108,87,.10)",
+        background:
+          "rgba(69,108,87,.10)",
         color: "#456C57",
-        marginBottom: 22,
+        marginBottom: 24,
       }}
     >
       {children}
@@ -162,63 +696,230 @@ function SettingIcon({
   );
 }
 
-function SettingContent({
-  title,
-  description,
+function PaneEyebrow({
+  children,
 }: {
-  title: string;
-  description: string;
+  children: React.ReactNode;
 }) {
   return (
-    <div>
-      <h2
-        style={{
-          margin: 0,
-          fontSize: 30,
-          fontFamily: "var(--font-serif)",
-        }}
-      >
-        {title}
-      </h2>
-
-      <p
-        style={{
-          marginTop: 8,
-          marginBottom: 24,
-          color: "#7A887C",
-          fontSize: 15,
-          lineHeight: 1.6,
-        }}
-      >
-        {description}
-      </p>
+    <div
+      style={{
+        fontSize: 11,
+        letterSpacing: 1.7,
+        textTransform: "uppercase",
+        fontWeight: 700,
+        color: "#456C57",
+        marginBottom: 7,
+      }}
+    >
+      {children}
     </div>
   );
 }
 
-const linkStyle: React.CSSProperties = {
+function SectionLabel({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      style={{
+        fontSize: 11,
+        letterSpacing: 1.4,
+        textTransform: "uppercase",
+        fontWeight: 700,
+        color: "#456C57",
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function InfoRow({
+  label,
+  description,
+}: {
+  label: string;
+  description: string;
+}) {
+  return (
+    <div
+      style={{
+        padding: "13px 15px",
+        borderRadius: 15,
+        background:
+          "rgba(69,108,87,.06)",
+      }}
+    >
+      <div
+        style={{
+          fontSize: 14,
+          fontWeight: 700,
+          color: "#456C57",
+        }}
+      >
+        {label}
+      </div>
+
+      <div
+        style={{
+          marginTop: 3,
+          fontSize: 12,
+          color: "#8A968C",
+        }}
+      >
+        {description}
+      </div>
+    </div>
+  );
+}
+
+function ToggleRow({
+  icon,
+  title,
+  description,
+  enabled,
+  onToggle,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  enabled: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-pressed={enabled}
+      style={{
+        width: "100%",
+        border: "none",
+        borderRadius: 16,
+        padding: "13px 14px",
+        background:
+          "rgba(69,108,87,.055)",
+        color: "#3F5345",
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        textAlign: "left",
+        cursor: "pointer",
+      }}
+    >
+      <div
+        style={{
+          width: 34,
+          height: 34,
+          flexShrink: 0,
+          borderRadius: 11,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background:
+            "rgba(69,108,87,.10)",
+          color: "#456C57",
+        }}
+      >
+        {icon}
+      </div>
+
+      <div
+        style={{
+          flex: 1,
+          minWidth: 0,
+        }}
+      >
+        <div
+          style={{
+            fontSize: 13,
+            fontWeight: 700,
+          }}
+        >
+          {title}
+        </div>
+
+        <div
+          style={{
+            marginTop: 2,
+            fontSize: 11,
+            color: "#8A968C",
+            lineHeight: 1.4,
+          }}
+        >
+          {description}
+        </div>
+      </div>
+
+      <div
+        style={{
+          width: 42,
+          height: 24,
+          flexShrink: 0,
+          borderRadius: 999,
+          padding: 3,
+          boxSizing: "border-box",
+          background: enabled
+            ? "#456C57"
+            : "rgba(69,108,87,.18)",
+          transition: ".25s ease",
+        }}
+      >
+        <div
+          style={{
+            width: 18,
+            height: 18,
+            borderRadius: "50%",
+            background: "white",
+            transform: enabled
+              ? "translateX(18px)"
+              : "translateX(0)",
+            transition: ".25s ease",
+            boxShadow:
+              "0 2px 5px rgba(0,0,0,.12)",
+          }}
+        />
+      </div>
+    </button>
+  );
+}
+
+/* =========================================================
+   STYLES
+========================================================= */
+
+const paneTitleStyle: React.CSSProperties = {
+  margin: 0,
+  fontSize:
+    "clamp(28px, 2.4vw, 36px)",
+  fontFamily: "var(--font-serif)",
+  fontWeight: 500,
+  lineHeight: 1.1,
+  color: "#3F5345",
+};
+
+const descriptionStyle: React.CSSProperties = {
+  margin: "12px 0 0",
+  color: "#7A887C",
+  fontSize: 15,
+  lineHeight: 1.7,
+};
+
+const largeLinkStyle: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",
   width: "100%",
   boxSizing: "border-box",
-  padding: "13px 15px",
-  borderRadius: 15,
-  background: "rgba(69,108,87,.08)",
+  padding: "14px 16px",
+  borderRadius: 16,
+  background:
+    "rgba(69,108,87,.09)",
   color: "#456C57",
   textDecoration: "none",
   fontWeight: 700,
   fontSize: 14,
-};
-
-const statusStyle: React.CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 8,
-  padding: "13px 15px",
-  borderRadius: 15,
-  background: "rgba(120,130,120,.10)",
-  color: "#7A887C",
-  fontWeight: 600,
-  fontSize: 14,
+  transition: ".25s ease",
 };

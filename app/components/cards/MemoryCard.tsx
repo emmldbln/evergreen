@@ -50,9 +50,6 @@ export default function MemoryCard({
   /*
    * Make sure the selected index can never point
    * outside the current memories array.
-   *
-   * This avoids needing another effect just to
-   * synchronize state with props.
    */
   const safeIndex = Math.min(
     index,
@@ -84,19 +81,23 @@ export default function MemoryCard({
           fill
           sizes="(max-width: 470px) 100vw, 470px"
           style={{
-          objectFit: "cover",
+            objectFit: "cover",
           }}
           unoptimized
         />
-        
-        {/* Image overlay */}
+
+        {/* =========================
+            IMAGE OVERLAY
+            ========================= */}
 
         <div
           style={{
             position: "absolute",
             inset: 0,
+
             background:
               "linear-gradient(to top, rgba(0,0,0,.70), rgba(0,0,0,.10), transparent)",
+
             pointerEvents: "none",
           }}
         />
@@ -109,15 +110,25 @@ export default function MemoryCard({
           <div
             style={{
               position: "absolute",
+
               top: 20,
               right: 20,
 
-              padding: "8px 16px",
+              padding: "8px 15px",
 
               borderRadius: 999,
 
+              /*
+               * Soft glass background.
+               * This gives the text something
+               * readable to sit on without
+               * making the pill look heavy.
+               */
               background:
-                "rgba(255,255,255,.20)",
+                "rgba(255,255,255,.18)",
+
+              border:
+                "1px solid rgba(255,255,255,.32)",
 
               backdropFilter:
                 "blur(16px)",
@@ -125,13 +136,34 @@ export default function MemoryCard({
               WebkitBackdropFilter:
                 "blur(16px)",
 
-              color: "white",
+              /*
+               * Slightly darker than pure white
+               * so it remains visible on bright
+               * photographs.
+               */
+              color:
+                "rgba(42,62,50,.82)",
 
               fontSize: 14,
-              fontWeight: 500,
+
+              fontWeight: 600,
+
+              letterSpacing: 0.2,
+
+              whiteSpace: "nowrap",
+
+              /*
+               * Helps preserve readability
+               * when the pill overlaps a bright
+               * part of the photograph.
+               */
+              textShadow:
+                "0 1px 4px rgba(255,255,255,.55)",
 
               boxShadow:
                 "0 8px 24px rgba(0,0,0,.12)",
+
+              zIndex: 2,
             }}
           >
             {memory.date}
@@ -149,16 +181,23 @@ export default function MemoryCard({
             left: 28,
             right: 28,
             bottom: 28,
+
+            zIndex: 2,
           }}
         >
           <h2
             style={{
               color: "white",
+
               fontSize: 38,
+
               margin: 0,
+
               lineHeight: 1.15,
+
               fontFamily:
                 "var(--font-serif)",
+
               textShadow:
                 "0 3px 15px rgba(0,0,0,.35)",
             }}
@@ -181,9 +220,13 @@ export default function MemoryCard({
           <p
             style={{
               color: "#6D7A70",
+
               lineHeight: 1.8,
+
               fontSize: 17,
+
               marginTop: 0,
+
               marginBottom: 10,
             }}
           >
@@ -195,7 +238,9 @@ export default function MemoryCard({
           <p
             style={{
               color: "#9AA69B",
+
               fontSize: 15,
+
               margin: 0,
             }}
           >

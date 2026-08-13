@@ -2,678 +2,569 @@
 
 import { useEffect, useState } from "react";
 
-interface Leaf {
-  id: number;
-  left: string;
-  size: string;
-  duration: string;
-  delay: string;
-  rotation: string;
-  drift: string;
-  opacity: number;
+const EXPERIENCE_STORAGE_KEY =
+  "evergreen-experience-settings";
+
+interface ExperienceSettings {
+  fallingLeaves: boolean;
+  floatingParticles: boolean;
+  reducedMotion: boolean;
 }
 
-interface Particle {
-  id: number;
-  left: string;
-  top: string;
-  size: string;
-  duration: string;
-  delay: string;
-  opacity: number;
-}
+const DEFAULT_EXPERIENCE: ExperienceSettings = {
+  fallingLeaves: true,
+  floatingParticles: true,
+  reducedMotion: false,
+};
 
-/*
- * Deterministic pseudo-random generator.
+/**
+ * Deterministic particle data.
  *
  * IMPORTANT:
- * Do not use Math.random() here.
+ * Do not replace these with Math.random().
  *
- * Background is rendered on both the server and client,
- * so generated values must remain identical.
+ * These values are identical on the server and client,
+ * which prevents hydration mismatches.
  */
-function seededRandom(seed: number): number {
-  const x = Math.sin(seed * 12.9898) * 43758.5453;
+const PARTICLES = [
+  {
+    id: 1,
+    left: 8.4,
+    top: 12.7,
+    size: 4.2,
+    opacity: 0.24,
+    duration: 8.4,
+    delay: -3.1,
+  },
+  {
+    id: 2,
+    left: 18.7,
+    top: 28.3,
+    size: 3.1,
+    opacity: 0.31,
+    duration: 10.2,
+    delay: -6.4,
+  },
+  {
+    id: 3,
+    left: 29.4,
+    top: 7.8,
+    size: 5.1,
+    opacity: 0.19,
+    duration: 7.8,
+    delay: -2.7,
+  },
+  {
+    id: 4,
+    left: 41.8,
+    top: 42.6,
+    size: 2.8,
+    opacity: 0.36,
+    duration: 11.4,
+    delay: -8.2,
+  },
+  {
+    id: 5,
+    left: 53.2,
+    top: 18.4,
+    size: 4.7,
+    opacity: 0.27,
+    duration: 9.7,
+    delay: -4.9,
+  },
+  {
+    id: 6,
+    left: 64.6,
+    top: 61.7,
+    size: 3.4,
+    opacity: 0.33,
+    duration: 12.1,
+    delay: -7.3,
+  },
+  {
+    id: 7,
+    left: 76.3,
+    top: 34.1,
+    size: 5.4,
+    opacity: 0.22,
+    duration: 8.9,
+    delay: -5.8,
+  },
+  {
+    id: 8,
+    left: 87.9,
+    top: 73.5,
+    size: 3.0,
+    opacity: 0.29,
+    duration: 10.8,
+    delay: -1.9,
+  },
+  {
+    id: 9,
+    left: 94.2,
+    top: 16.8,
+    size: 4.4,
+    opacity: 0.21,
+    duration: 13.2,
+    delay: -9.4,
+  },
+  {
+    id: 10,
+    left: 12.6,
+    top: 68.2,
+    size: 3.7,
+    opacity: 0.34,
+    duration: 9.3,
+    delay: -4.2,
+  },
+  {
+    id: 11,
+    left: 36.5,
+    top: 82.4,
+    size: 4.9,
+    opacity: 0.25,
+    duration: 11.7,
+    delay: -6.1,
+  },
+  {
+    id: 12,
+    left: 58.8,
+    top: 89.1,
+    size: 2.6,
+    opacity: 0.39,
+    duration: 8.1,
+    delay: -2.4,
+  },
+  {
+    id: 13,
+    left: 72.1,
+    top: 9.5,
+    size: 3.8,
+    opacity: 0.28,
+    duration: 12.6,
+    delay: -10.1,
+  },
+  {
+    id: 14,
+    left: 83.7,
+    top: 47.9,
+    size: 5.0,
+    opacity: 0.23,
+    duration: 10.5,
+    delay: -5.3,
+  },
+  {
+    id: 15,
+    left: 97.1,
+    top: 91.3,
+    size: 3.3,
+    opacity: 0.32,
+    duration: 9.1,
+    delay: -7.8,
+  },
+];
 
-  return x - Math.floor(x);
-}
-
-/*
- * Generate leaves deterministically.
+/**
+ * Deterministic leaves.
  *
- * CSS values are converted into fixed strings here so that
- * server and client serialization remains identical.
+ * Again, no Math.random() here.
  */
-function generateLeaves(): Leaf[] {
-  return Array.from({ length: 20 }, (_, index) => {
-    const random = (offset: number) =>
-      seededRandom(index * 100 + offset);
+const LEAVES = [
+  {
+    id: 1,
+    left: 8,
+    width: 31,
+    height: 18,
+    opacity: 0.18,
+    duration: 21,
+    delay: -5,
+    rotation: 28,
+  },
+  {
+    id: 2,
+    left: 22,
+    width: 42,
+    height: 24,
+    opacity: 0.24,
+    duration: 25,
+    delay: -11,
+    rotation: 117,
+  },
+  {
+    id: 3,
+    left: 37,
+    width: 28,
+    height: 16,
+    opacity: 0.20,
+    duration: 18,
+    delay: -3,
+    rotation: 204,
+  },
+  {
+    id: 4,
+    left: 51,
+    width: 36,
+    height: 21,
+    opacity: 0.16,
+    duration: 27,
+    delay: -14,
+    rotation: 291,
+  },
+  {
+    id: 5,
+    left: 66,
+    width: 30,
+    height: 17,
+    opacity: 0.23,
+    duration: 23,
+    delay: -8,
+    rotation: 156,
+  },
+  {
+    id: 6,
+    left: 79,
+    width: 44,
+    height: 25,
+    opacity: 0.19,
+    duration: 26,
+    delay: -17,
+    rotation: 341,
+  },
+  {
+    id: 7,
+    left: 91,
+    width: 27,
+    height: 16,
+    opacity: 0.22,
+    duration: 20,
+    delay: -6,
+    rotation: 73,
+  },
+];
+
+/**
+ * Safely read experience settings.
+ */
+function readExperienceSettings(): ExperienceSettings {
+  if (typeof window === "undefined") {
+    return DEFAULT_EXPERIENCE;
+  }
+
+  try {
+    const stored = localStorage.getItem(
+      EXPERIENCE_STORAGE_KEY
+    );
+
+    if (!stored) {
+      return DEFAULT_EXPERIENCE;
+    }
+
+    const parsed: unknown = JSON.parse(stored);
+
+    if (
+      typeof parsed !== "object" ||
+      parsed === null
+    ) {
+      return DEFAULT_EXPERIENCE;
+    }
+
+    const data = parsed as Record<string, unknown>;
 
     return {
-      id: index,
+      fallingLeaves:
+        typeof data.fallingLeaves === "boolean"
+          ? data.fallingLeaves
+          : DEFAULT_EXPERIENCE.fallingLeaves,
 
-      left: `${(random(1) * 100).toFixed(4)}%`,
+      floatingParticles:
+        typeof data.floatingParticles === "boolean"
+          ? data.floatingParticles
+          : DEFAULT_EXPERIENCE.floatingParticles,
 
-      size: `${(18 + random(2) * 32).toFixed(4)}px`,
-
-      duration: `${(15 + random(3) * 16).toFixed(4)}s`,
-
-      delay: `${(random(4) * -30).toFixed(4)}s`,
-
-      rotation: `${(random(5) * 360).toFixed(4)}deg`,
-
-      drift: `${(-120 + random(6) * 240).toFixed(4)}px`,
-
-      opacity: 0.13 + random(7) * 0.16,
+      reducedMotion:
+        typeof data.reducedMotion === "boolean"
+          ? data.reducedMotion
+          : DEFAULT_EXPERIENCE.reducedMotion,
     };
-  });
+  } catch {
+    return DEFAULT_EXPERIENCE;
+  }
 }
-
-/*
- * Generate particles deterministically.
- *
- * CSS values are converted into fixed strings here so that
- * server and client serialization remains identical.
- */
-function generateParticles(): Particle[] {
-  return Array.from({ length: 45 }, (_, index) => {
-    const random = (offset: number) =>
-      seededRandom(index * 100 + offset + 5000);
-
-    return {
-      id: index,
-
-      left: `${(random(1) * 100).toFixed(4)}%`,
-
-      top: `${(random(2) * 100).toFixed(4)}%`,
-
-      size: `${(2 + random(3) * 4).toFixed(4)}px`,
-
-      duration: `${(4 + random(4) * 9).toFixed(4)}s`,
-
-      delay: `${(random(5) * -12).toFixed(4)}s`,
-
-      opacity: 0.18 + random(6) * 0.30,
-    };
-  });
-}
-
-const leaves = generateLeaves();
-const particles = generateParticles();
 
 export default function Background() {
-  const [scrollY, setScrollY] = useState(0);
-
-  /*
-   * Scroll parallax only.
+  /**
+   * IMPORTANT:
+   *
+   * Start with deterministic defaults.
+   *
+   * This means the first server render and first client
+   * render are identical.
    */
-  useEffect(() => {
-    const handleScroll = () => {
-      setScrollY(window.scrollY);
-    };
+  const [experience, setExperience] =
+    useState<ExperienceSettings>(
+      DEFAULT_EXPERIENCE
+    );
 
-    window.addEventListener("scroll", handleScroll, {
-      passive: true,
-    });
+  useEffect(() => {
+    /**
+     * Read the user's saved settings after hydration.
+     */
+    setExperience(readExperienceSettings());
+
+    /**
+     * Listen for changes made by SettingsPage in the
+     * same browser tab.
+     */
+    function handleExperienceChange() {
+      setExperience(
+        readExperienceSettings()
+      );
+    }
+
+    window.addEventListener(
+      "evergreen-experience-changed",
+      handleExperienceChange
+    );
+
+    /**
+     * Also listen to normal storage changes.
+     *
+     * This covers changes coming from another tab.
+     */
+    window.addEventListener(
+      "storage",
+      handleExperienceChange
+    );
 
     return () => {
-      window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener(
+        "evergreen-experience-changed",
+        handleExperienceChange
+      );
+
+      window.removeEventListener(
+        "storage",
+        handleExperienceChange
+      );
     };
   }, []);
 
+  const {
+    fallingLeaves,
+    floatingParticles,
+    reducedMotion,
+  } = experience;
+
+  /**
+   * Reduced motion disables the decorative animation
+   * while keeping the background itself visible.
+   */
+  const animationPlayState = reducedMotion
+    ? "paused"
+    : "running";
+
   return (
-    <>
-      {/* =====================================================
-          GLOBAL BACKGROUND
-          ===================================================== */}
+    <div
+      aria-hidden="true"
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: -1,
+        overflow: "hidden",
+        pointerEvents: "none",
+        background:
+          "linear-gradient(135deg, #dceee4 0%, #eef7f1 45%, #f5f4e8 100%)",
+      }}
+    >
+      {/* =========================================
+          SOFT BACKGROUND GLOW
+      ========================================= */}
 
       <div
-        aria-hidden="true"
         style={{
-          position: "fixed",
-          inset: 0,
-          width: "100%",
-          height: "100%",
-          overflow: "hidden",
-          pointerEvents: "none",
-          zIndex: -1,
-
+          position: "absolute",
+          width: "55vw",
+          height: "55vw",
+          maxWidth: 850,
+          maxHeight: 850,
+          left: "-15vw",
+          top: "-20vw",
+          borderRadius: "50%",
           background:
-            "linear-gradient(180deg, #E4F1E7 0%, #F2F8F3 45%, #E2EFE5 100%)",
+            "radial-gradient(circle, rgba(87,145,108,.18), rgba(87,145,108,0) 70%)",
+          filter: "blur(20px)",
         }}
-      >
-        {/* =================================================
-            LARGE GREEN AURORA
-            ================================================= */}
+      />
 
-        <div
-          style={{
-            position: "absolute",
+      <div
+        style={{
+          position: "absolute",
+          width: "50vw",
+          height: "50vw",
+          maxWidth: 800,
+          maxHeight: 800,
+          right: "-15vw",
+          top: "5vw",
+          borderRadius: "50%",
+          background:
+            "radial-gradient(circle, rgba(194,204,130,.14), rgba(194,204,130,0) 70%)",
+          filter: "blur(25px)",
+        }}
+      />
 
-            width: "85vw",
-            height: "85vw",
+      <div
+        style={{
+          position: "absolute",
+          width: "65vw",
+          height: "45vw",
+          maxWidth: 1000,
+          maxHeight: 700,
+          left: "20vw",
+          bottom: "-25vw",
+          borderRadius: "50%",
+          background:
+            "radial-gradient(circle, rgba(92,145,104,.10), rgba(92,145,104,0) 70%)",
+          filter: "blur(30px)",
+        }}
+      />
 
-            maxWidth: 1000,
-            maxHeight: 1000,
+      {/* =========================================
+          PARTICLES
+      ========================================= */}
 
-            left: "-25%",
-            top: "-35%",
-
-            borderRadius: "50%",
-
-            background:
-              "radial-gradient(circle, rgba(72,137,98,.34) 0%, rgba(88,153,110,.22) 30%, rgba(111,168,130,.10) 50%, transparent 74%)",
-
-            filter: "blur(40px)",
-
-            transform: `translate3d(0, ${scrollY * 0.08}px, 0)`,
-
-            animation:
-              "evergreenAuroraOne 16s ease-in-out infinite alternate",
-          }}
-        />
-
-        {/* =================================================
-            SECOND GREEN AURORA
-            ================================================= */}
-
-        <div
-          style={{
-            position: "absolute",
-
-            width: "75vw",
-            height: "75vw",
-
-            maxWidth: 900,
-            maxHeight: 900,
-
-            right: "-25%",
-            top: "5%",
-
-            borderRadius: "50%",
-
-            background:
-              "radial-gradient(circle, rgba(102,157,119,.30) 0%, rgba(135,178,145,.20) 32%, rgba(166,199,170,.10) 52%, transparent 75%)",
-
-            filter: "blur(50px)",
-
-            transform: `translate3d(0, ${scrollY * -0.06}px, 0)`,
-
-            animation:
-              "evergreenAuroraTwo 19s ease-in-out infinite alternate",
-          }}
-        />
-
-        {/* =================================================
-            LOWER GREEN GLOW
-            ================================================= */}
-
-        <div
-          style={{
-            position: "absolute",
-
-            width: "70vw",
-            height: "70vw",
-
-            maxWidth: 850,
-            maxHeight: 850,
-
-            left: "5%",
-            bottom: "-40%",
-
-            borderRadius: "50%",
-
-            background:
-              "radial-gradient(circle, rgba(65,121,88,.23) 0%, rgba(92,146,108,.12) 42%, transparent 74%)",
-
-            filter: "blur(55px)",
-
-            animation:
-              "evergreenAuroraThree 22s ease-in-out infinite alternate",
-          }}
-        />
-
-        {/* =================================================
-            WARM SUNLIGHT
-            ================================================= */}
-
-        <div
-          style={{
-            position: "absolute",
-
-            width: 600,
-            height: 600,
-
-            right: "-180px",
-            top: "-200px",
-
-            borderRadius: "50%",
-
-            background:
-              "radial-gradient(circle, rgba(255,247,210,.65) 0%, rgba(255,238,185,.35) 30%, rgba(255,232,173,.12) 52%, transparent 75%)",
-
-            filter: "blur(35px)",
-
-            transform: `translate3d(0, ${scrollY * 0.04}px, 0)`,
-
-            animation:
-              "evergreenSun 13s ease-in-out infinite alternate",
-          }}
-        />
-
-        {/* =================================================
-            SECOND WARM GLOW
-            ================================================= */}
-
-        <div
-          style={{
-            position: "absolute",
-
-            width: 420,
-            height: 420,
-
-            left: "-140px",
-            bottom: "10%",
-
-            borderRadius: "50%",
-
-            background:
-              "radial-gradient(circle, rgba(224,243,215,.45) 0%, transparent 72%)",
-
-            filter: "blur(45px)",
-
-            animation:
-              "evergreenSunTwo 18s ease-in-out infinite alternate",
-          }}
-        />
-
-        {/* =================================================
-            FLOATING LIGHT PARTICLES
-            ================================================= */}
-
-        {particles.map((particle) => (
+      {floatingParticles &&
+        PARTICLES.map((particle) => (
           <div
             key={`particle-${particle.id}`}
             style={{
               position: "absolute",
-
-              left: particle.left,
-              top: particle.top,
-
-              width: particle.size,
-              height: particle.size,
-
+              left: `${particle.left}%`,
+              top: `${particle.top}%`,
+              width: `${particle.size}px`,
+              height: `${particle.size}px`,
               borderRadius: "50%",
-
-              background: "rgba(255,255,255,.95)",
-
+              background:
+                "rgba(255,255,255,.95)",
               opacity: particle.opacity,
-
               boxShadow:
                 "0 0 12px rgba(255,255,255,.75)",
-
-              animation: `evergreenParticle ${particle.duration} ease-in-out ${particle.delay} infinite alternate`,
+              animation:
+                `evergreenParticle ${particle.duration}s ease-in-out ${particle.delay}s infinite alternate`,
+              animationPlayState,
             }}
           />
         ))}
 
-        {/* =================================================
-            LARGER BOKEH PARTICLES
-            ================================================= */}
+      {/* =========================================
+          FALLING LEAVES
+      ========================================= */}
 
-        <div
-          style={{
-            position: "absolute",
-            width: 12,
-            height: 12,
-            left: "17%",
-            top: "28%",
-            borderRadius: "50%",
-            background: "rgba(255,255,255,.65)",
-            filter: "blur(2px)",
-            boxShadow:
-              "0 0 22px rgba(255,255,255,.65)",
-            animation:
-              "evergreenBokeh 7s ease-in-out infinite alternate",
-          }}
-        />
-
-        <div
-          style={{
-            position: "absolute",
-            width: 9,
-            height: 9,
-            right: "19%",
-            top: "55%",
-            borderRadius: "50%",
-            background: "rgba(255,255,255,.55)",
-            filter: "blur(2px)",
-            boxShadow:
-              "0 0 20px rgba(255,255,255,.60)",
-            animation:
-              "evergreenBokeh 9s ease-in-out 1s infinite alternate",
-          }}
-        />
-
-        <div
-          style={{
-            position: "absolute",
-            width: 15,
-            height: 15,
-            left: "72%",
-            top: "20%",
-            borderRadius: "50%",
-            background: "rgba(255,255,255,.50)",
-            filter: "blur(3px)",
-            boxShadow:
-              "0 0 28px rgba(255,255,255,.60)",
-            animation:
-              "evergreenBokeh 11s ease-in-out 2s infinite alternate",
-          }}
-        />
-
-        {/* =================================================
-            FALLING LEAVES
-            ================================================= */}
-
-        {leaves.map((leaf) => (
+      {fallingLeaves &&
+        LEAVES.map((leaf) => (
           <div
             key={`leaf-${leaf.id}`}
             style={{
               position: "absolute",
-
-              left: leaf.left,
+              left: `${leaf.left}%`,
               top: "-80px",
-
-              width: leaf.size,
-              height: `${(
-                parseFloat(leaf.size) * 0.58
-              ).toFixed(4)}px`,
-
+              width: `${leaf.width}px`,
+              height: `${leaf.height}px`,
               opacity: leaf.opacity,
-
-              animation: `evergreenLeaf ${leaf.duration} linear ${leaf.delay} infinite`,
+              animation:
+                `evergreenLeaf ${leaf.duration}s linear ${leaf.delay}s infinite`,
+              animationPlayState,
             }}
           >
-            {/* Leaf */}
-
             <div
               style={{
                 position: "absolute",
                 inset: 0,
-
                 borderRadius:
                   "100% 0 100% 0",
-
                 background:
-                  "linear-gradient(135deg, rgba(48,105,69,.88), rgba(92,145,104,.72) 55%, rgba(139,174,143,.55))",
-
-                transform: `rotate(${leaf.rotation})`,
-
+                  "linear-gradient(135deg, rgba(48,105,69,.88), rgba(92,145,104,.72) 55%, rgba(140,173,135,.48))",
+                transform: `rotate(${leaf.rotation}deg)`,
                 boxShadow:
                   "0 3px 10px rgba(54,95,76,.12)",
               }}
-            />
-
-            {/* Leaf vein */}
-
-            <div
-              style={{
-                position: "absolute",
-
-                width: "72%",
-                height: "1px",
-
-                left: "14%",
-                top: "50%",
-
-                background:
-                  "rgba(255,255,255,.30)",
-
-                transform: `rotate(${leaf.rotation})`,
-
-                transformOrigin:
-                  "left center",
-              }}
-            />
+            >
+              <div
+                style={{
+                  position: "absolute",
+                  width: "72%",
+                  height: 1,
+                  left: "14%",
+                  top: "50%",
+                  background:
+                    "rgba(255,255,255,.30)",
+                  transform:
+                    `rotate(${leaf.rotation}deg)`,
+                  transformOrigin:
+                    "left center",
+                }}
+              />
+            </div>
           </div>
         ))}
 
-        {/* =================================================
-            SOFT VIGNETTE
-            ================================================= */}
+      {/* =========================================
+          ANIMATION STYLES
+      ========================================= */}
 
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-
-            background:
-              "radial-gradient(circle at center, transparent 38%, rgba(38,83,58,.075) 100%)",
-          }}
-        />
-
-        {/* =================================================
-            VERY SUBTLE TOP LIGHT
-            ================================================= */}
-
-        <div
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            height: "30%",
-
-            background:
-              "linear-gradient(180deg, rgba(255,255,255,.20), transparent)",
-
-            opacity: 0.7,
-          }}
-        />
-      </div>
-
-      {/* =====================================================
-          GLOBAL ANIMATIONS
-          ===================================================== */}
-
-      <style jsx global>{`
-        @keyframes evergreenAuroraOne {
-          0% {
-            transform:
-              translate3d(-5%, -3%, 0)
-              scale(0.95);
-          }
-
-          50% {
-            transform:
-              translate3d(7%, 5%, 0)
-              scale(1.10);
-          }
-
-          100% {
-            transform:
-              translate3d(-2%, 9%, 0)
-              scale(1.02);
-          }
-        }
-
-        @keyframes evergreenAuroraTwo {
-          0% {
-            transform:
-              translate3d(5%, 3%, 0)
-              scale(0.96);
-          }
-
-          50% {
-            transform:
-              translate3d(-7%, -5%, 0)
-              scale(1.10);
-          }
-
-          100% {
-            transform:
-              translate3d(3%, 7%, 0)
-              scale(1.02);
-          }
-        }
-
-        @keyframes evergreenAuroraThree {
-          0% {
-            transform:
-              translate3d(-3%, 2%, 0)
-              scale(0.95);
-          }
-
-          100% {
-            transform:
-              translate3d(8%, -7%, 0)
-              scale(1.12);
-          }
-        }
-
-        @keyframes evergreenSun {
-          0% {
-            opacity: 0.55;
-            transform: scale(0.92);
-          }
-
-          50% {
-            opacity: 0.85;
-          }
-
-          100% {
-            opacity: 1;
-            transform: scale(1.12);
-          }
-        }
-
-        @keyframes evergreenSunTwo {
-          0% {
-            opacity: 0.35;
-            transform: scale(0.9);
-          }
-
-          100% {
-            opacity: 0.75;
-            transform: scale(1.15);
-          }
-        }
-
+      <style jsx>{`
         @keyframes evergreenParticle {
           0% {
-            transform:
-              translate3d(0, 0, 0)
-              scale(0.65);
-
-            opacity: 0.08;
+            transform: translate3d(0, 0, 0);
           }
 
-          35% {
-            opacity: 0.40;
-          }
-
-          70% {
-            opacity: 0.65;
+          50% {
+            transform: translate3d(8px, -12px, 0);
           }
 
           100% {
-            transform:
-              translate3d(18px, -30px, 0)
-              scale(1.35);
-
-            opacity: 0.12;
-          }
-        }
-
-        @keyframes evergreenBokeh {
-          0% {
-            transform:
-              translate3d(0, 0, 0)
-              scale(0.75);
-
-            opacity: 0.25;
-          }
-
-          100% {
-            transform:
-              translate3d(20px, -25px, 0)
-              scale(1.25);
-
-            opacity: 0.75;
+            transform: translate3d(-6px, 10px, 0);
           }
         }
 
         @keyframes evergreenLeaf {
           0% {
             transform:
-              translate3d(0, -100px, 0)
+              translate3d(0, -10vh, 0)
               rotate(0deg);
           }
 
-          20% {
+          25% {
             transform:
-              translate3d(55px, 20vh, 0)
-              rotate(75deg);
+              translate3d(5vw, 25vh, 0)
+              rotate(90deg);
           }
 
-          40% {
+          50% {
             transform:
-              translate3d(-45px, 40vh, 0)
-              rotate(150deg);
+              translate3d(-4vw, 50vh, 0)
+              rotate(180deg);
           }
 
-          60% {
+          75% {
             transform:
-              translate3d(65px, 60vh, 0)
-              rotate(225deg);
-          }
-
-          80% {
-            transform:
-              translate3d(-35px, 80vh, 0)
-              rotate(300deg);
+              translate3d(6vw, 75vh, 0)
+              rotate(270deg);
           }
 
           100% {
             transform:
-              translate3d(45px, 115vh, 0)
+              translate3d(-3vw, 115vh, 0)
               rotate(360deg);
           }
         }
 
         @media (prefers-reduced-motion: reduce) {
-          *,
-          *::before,
-          *::after {
-            animation-duration: 0.01ms !important;
+          * {
+            animation-duration: 0.001ms !important;
             animation-iteration-count: 1 !important;
-            scroll-behavior: auto !important;
-          }
-        }
-
-        @media (max-width: 600px) {
-          @keyframes evergreenLeaf {
-            0% {
-              transform:
-                translate3d(0, -100px, 0)
-                rotate(0deg);
-            }
-
-            50% {
-              transform:
-                translate3d(25px, 55vh, 0)
-                rotate(180deg);
-            }
-
-            100% {
-              transform:
-                translate3d(-20px, 115vh, 0)
-                rotate(360deg);
-            }
           }
         }
       `}</style>
-    </>
+    </div>
   );
 }
