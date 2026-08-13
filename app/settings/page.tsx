@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   UserRound,
@@ -49,8 +49,21 @@ export default function SettingsPage() {
      SECRET ADMIN
   ======================================================= */
 
-  const [secretTapCount, setSecretTapCount] =
-    useState(0);
+  /*
+   * The shield icon is the ONLY secret admin trigger.
+   *
+   * Three clicks within 1.5 seconds opens /admin.
+   *
+   * Refs are intentionally used here so the sequence
+   * does not depend on React state update timing.
+   */
+
+  const secretTapCount = useRef(0);
+
+  const secretTapTimer =
+    useRef<ReturnType<typeof setTimeout> | null>(
+      null
+    );
 
   /* =======================================================
      LOAD SAVED SETTINGS
@@ -62,6 +75,18 @@ export default function SettingsPage() {
 
     setDisplayName(profile.displayName);
     setExperience(experienceSettings);
+  }, []);
+
+  /* =======================================================
+     CLEANUP
+  ======================================================= */
+
+  useEffect(() => {
+    return () => {
+      if (secretTapTimer.current !== null) {
+        clearTimeout(secretTapTimer.current);
+      }
+    };
   }, []);
 
   /* =======================================================
@@ -107,24 +132,37 @@ export default function SettingsPage() {
   }
 
   /* =======================================================
-     SECRET ADMIN GESTURE
+     SECRET ADMIN
   ======================================================= */
 
   function handleSecretAdminTap() {
-    setSecretTapCount((current) => {
-      const next = current + 1;
+    if (secretTapTimer.current !== null) {
+      clearTimeout(secretTapTimer.current);
+      secretTapTimer.current = null;
+    }
 
-      if (next >= 5) {
-        window.location.href = "/admin";
-        return 0;
-      }
+    secretTapCount.current += 1;
 
-      return next;
-    });
+    /*
+     * Third click opens Admin CMS.
+     */
 
-    window.setTimeout(() => {
-      setSecretTapCount(0);
-    }, 1800);
+    if (secretTapCount.current >= 3) {
+      secretTapCount.current = 0;
+
+      window.location.assign("/admin");
+
+      return;
+    }
+
+    /*
+     * Reset if the user stops clicking.
+     */
+
+    secretTapTimer.current = setTimeout(() => {
+      secretTapCount.current = 0;
+      secretTapTimer.current = null;
+    }, 1500);
   }
 
   return (
@@ -151,29 +189,21 @@ export default function SettingsPage() {
             marginBottom: 34,
           }}
         >
-          <button
-            type="button"
-            onClick={handleSecretAdminTap}
-            style={{
-              appearance: "none",
-              border: "none",
-              background: "transparent",
-              padding: 0,
-              margin: 0,
+          {/* NOT CLICKABLE */}
 
+          <div
+            style={{
               fontSize: 13,
               letterSpacing: 2,
               textTransform: "uppercase",
-
               color: "#456C57",
               fontWeight: 700,
-
-              cursor: "default",
+              userSelect: "none",
+              WebkitUserSelect: "none",
             }}
-            aria-label="Evergreen"
           >
             Evergreen
-          </button>
+          </div>
 
           <h1
             style={{
@@ -460,7 +490,9 @@ export default function SettingsPage() {
                 </p>
               </div>
 
-              {/* DISPLAY NAME */}
+              {/* =================================================
+                  DISPLAY NAME
+              ================================================= */}
 
               <section
                 style={{
@@ -498,7 +530,9 @@ export default function SettingsPage() {
                 />
               </section>
 
-              {/* EXPERIENCE */}
+              {/* =================================================
+                  EXPERIENCE
+              ================================================= */}
 
               <section
                 style={{
@@ -565,7 +599,9 @@ export default function SettingsPage() {
                 </div>
               </section>
 
-              {/* SAVE */}
+              {/* =================================================
+                  SAVE
+              ================================================= */}
 
               <div
                 style={{
@@ -614,13 +650,17 @@ export default function SettingsPage() {
                     textAlign: "center",
                     color: "#8A968C",
                     fontSize: 12,
+                    userSelect: "none",
+                    WebkitUserSelect: "none",
                   }}
                 >
                   Saved on this device
                 </p>
               </div>
 
-              {/* SECRET ADMIN */}
+              {/* =================================================
+                  SECRET ADMIN
+              ================================================= */}
 
               <div
                 style={{
@@ -632,17 +672,127 @@ export default function SettingsPage() {
                   color:
                     "rgba(69,108,87,.42)",
                   fontSize: 11,
+
+                  /*
+                   * IMPORTANT:
+                   * The surrounding footer cannot be selected.
+                   */
+                  userSelect: "none",
+                  WebkitUserSelect: "none",
+                  WebkitTouchCallout: "none",
                 }}
               >
-                <Shield
-                  size={13}
-                  style={{
-                    verticalAlign: "middle",
-                    marginRight: 5,
-                  }}
-                />
+                {/* =================================================
+                    ISOLATED SECRET BUTTON
+                ================================================= */}
 
-                Personal settings
+                <button
+                  type="button"
+                  aria-label="Admin access"
+                  onPointerDown={(event) => {
+                    /*
+                     * Prevent text selection and prevent the
+                     * pointer event from reaching anything else.
+                     */
+                    event.preventDefault();
+                    event.stopPropagation();
+                  }}
+                  onPointerUp={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+
+                    handleSecretAdminTap();
+                  }}
+                  onClick={(event) => {
+                    /*
+                     * Explicitly consume the click as well.
+                     */
+                    event.preventDefault();
+                    event.stopPropagation();
+                  }}
+                  style={{
+                    appearance: "none",
+                    WebkitAppearance: "none",
+
+                    /*
+                     * The visible icon remains 13px,
+                     * but the actual hit target is 32x32.
+                     */
+                    width: 32,
+                    height: 32,
+
+                    padding: 0,
+                    margin: "0 4px 0 0",
+
+                    border: "none",
+                    outline: "none",
+
+                    borderRadius: "50%",
+
+                    background:
+                      "transparent",
+
+                    color: "inherit",
+
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+
+                    verticalAlign: "middle",
+
+                    cursor: "default",
+
+                    /*
+                     * Prevent selection on desktop.
+                     */
+                    userSelect: "none",
+                    WebkitUserSelect: "none",
+
+                    /*
+                     * Prevent long-press callouts on mobile.
+                     */
+                    WebkitTouchCallout: "none",
+
+                    /*
+                     * Keep pointer interaction isolated.
+                     */
+                    touchAction: "manipulation",
+
+                    position: "relative",
+                    zIndex: 100,
+
+                    /*
+                     * Prevent browser focus styling from
+                     * changing the visual appearance.
+                     */
+                    WebkitTapHighlightColor:
+                      "transparent",
+                  }}
+                >
+                  <Shield
+                    size={13}
+                    strokeWidth={1.8}
+                    style={{
+                      pointerEvents: "none",
+                      userSelect: "none",
+                      WebkitUserSelect: "none",
+                    }}
+                  />
+                </button>
+
+                {/* =================================================
+                    NON-INTERACTIVE TEXT
+                ================================================= */}
+
+                <span
+                  style={{
+                    pointerEvents: "none",
+                    userSelect: "none",
+                    WebkitUserSelect: "none",
+                  }}
+                >
+                  Personal settings
+                </span>
               </div>
             </div>
           </GlassCard>
@@ -709,7 +859,7 @@ function PaneEyebrow({
         textTransform: "uppercase",
         fontWeight: 700,
         color: "#456C57",
-        marginBottom: 7,
+        marginBottom: 8,
       }}
     >
       {children}
@@ -747,17 +897,19 @@ function InfoRow({
   return (
     <div
       style={{
-        padding: "13px 15px",
-        borderRadius: 15,
+        padding: "14px 15px",
+        borderRadius: 16,
         background:
-          "rgba(69,108,87,.06)",
+          "rgba(255,255,255,.36)",
+        border:
+          "1px solid rgba(69,108,87,.08)",
       }}
     >
       <div
         style={{
           fontSize: 14,
           fontWeight: 700,
-          color: "#456C57",
+          color: "#3F5345",
         }}
       >
         {label}
@@ -765,9 +917,10 @@ function InfoRow({
 
       <div
         style={{
-          marginTop: 3,
+          marginTop: 4,
           fontSize: 12,
-          color: "#8A968C",
+          color: "#879289",
+          lineHeight: 1.5,
         }}
       >
         {description}
@@ -793,27 +946,27 @@ function ToggleRow({
     <button
       type="button"
       onClick={onToggle}
-      aria-pressed={enabled}
       style={{
         width: "100%",
-        border: "none",
+        border:
+          "1px solid rgba(69,108,87,.08)",
         borderRadius: 16,
-        padding: "13px 14px",
-        background:
-          "rgba(69,108,87,.055)",
-        color: "#3F5345",
+        padding: "12px 13px",
+        background: enabled
+          ? "rgba(69,108,87,.07)"
+          : "rgba(255,255,255,.36)",
         display: "flex",
         alignItems: "center",
-        gap: 12,
+        gap: 11,
         textAlign: "left",
         cursor: "pointer",
+        color: "#3F5345",
       }}
     >
       <div
         style={{
           width: 34,
           height: 34,
-          flexShrink: 0,
           borderRadius: 11,
           display: "flex",
           alignItems: "center",
@@ -821,6 +974,7 @@ function ToggleRow({
           background:
             "rgba(69,108,87,.10)",
           color: "#456C57",
+          flexShrink: 0,
         }}
       >
         {icon}
@@ -845,7 +999,7 @@ function ToggleRow({
           style={{
             marginTop: 2,
             fontSize: 11,
-            color: "#8A968C",
+            color: "#879289",
             lineHeight: 1.4,
           }}
         >
@@ -855,16 +1009,20 @@ function ToggleRow({
 
       <div
         style={{
-          width: 42,
-          height: 24,
-          flexShrink: 0,
+          width: 38,
+          height: 22,
           borderRadius: 999,
-          padding: 3,
-          boxSizing: "border-box",
+          padding: 2,
           background: enabled
             ? "#456C57"
             : "rgba(69,108,87,.18)",
-          transition: ".25s ease",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: enabled
+            ? "flex-end"
+            : "flex-start",
+          transition: ".2s ease",
+          flexShrink: 0,
         }}
       >
         <div
@@ -873,10 +1031,6 @@ function ToggleRow({
             height: 18,
             borderRadius: "50%",
             background: "white",
-            transform: enabled
-              ? "translateX(18px)"
-              : "translateX(0)",
-            transition: ".25s ease",
             boxShadow:
               "0 2px 5px rgba(0,0,0,.12)",
           }}
@@ -892,19 +1046,18 @@ function ToggleRow({
 
 const paneTitleStyle: React.CSSProperties = {
   margin: 0,
-  fontSize:
-    "clamp(28px, 2.4vw, 36px)",
   fontFamily: "var(--font-serif)",
+  fontSize: 30,
+  lineHeight: 1.15,
   fontWeight: 500,
-  lineHeight: 1.1,
   color: "#3F5345",
 };
 
 const descriptionStyle: React.CSSProperties = {
-  margin: "12px 0 0",
+  margin: "10px 0 0",
+  fontSize: 14,
+  lineHeight: 1.65,
   color: "#7A887C",
-  fontSize: 15,
-  lineHeight: 1.7,
 };
 
 const largeLinkStyle: React.CSSProperties = {
@@ -913,13 +1066,12 @@ const largeLinkStyle: React.CSSProperties = {
   justifyContent: "space-between",
   width: "100%",
   boxSizing: "border-box",
-  padding: "14px 16px",
+  padding: "15px 16px",
   borderRadius: 16,
-  background:
-    "rgba(69,108,87,.09)",
+  background: "rgba(69,108,87,.08)",
   color: "#456C57",
   textDecoration: "none",
-  fontWeight: 700,
   fontSize: 14,
+  fontWeight: 700,
   transition: ".25s ease",
 };

@@ -27,7 +27,9 @@ async function findFolder(
   ];
 
   if (parentId) {
-    conditions.push(`'${parentId}' in parents`);
+    conditions.push(
+      `'${parentId}' in parents`
+    );
   }
 
   const response = await drive.files.list({
@@ -132,6 +134,10 @@ export async function getGoogleDriveClient() {
   });
 }
 
+/* =========================================================
+   EVERGREEN ROOT
+========================================================= */
+
 export async function getOrCreateEvergreenFolder() {
   const existingFolder =
     await findFolder(
@@ -165,6 +171,10 @@ export async function getOrCreateEvergreenFolder() {
       null,
   };
 }
+
+/* =========================================================
+   MEMORIES ROOT
+========================================================= */
 
 export async function getOrCreateMemoriesFolder() {
   const evergreenFolder =
@@ -207,30 +217,32 @@ export async function getOrCreateMemoriesFolder() {
   };
 }
 
-export async function getOrCreateAlbumFolder(
+/* =========================================================
+   ALBUM FOLDER
+========================================================= */
+
+/*
+ * IMPORTANT:
+ *
+ * An album must ALWAYS receive a brand-new
+ * Google Drive folder.
+ *
+ * We intentionally DO NOT search for an existing
+ * folder by album name here.
+ *
+ * This prevents:
+ *
+ * Album A -> Folder 123
+ * Album B -> Folder 123
+ *
+ * which was the source of the destructive deletion bug.
+ */
+
+export async function createAlbumFolder(
   albumName: string
 ) {
   const memoriesFolder =
     await getOrCreateMemoriesFolder();
-
-  const existingFolder =
-    await findFolder(
-      albumName,
-      memoriesFolder.id
-    );
-
-  if (existingFolder) {
-    return {
-      id: existingFolder.id,
-      name:
-        existingFolder.name ??
-        albumName,
-      webViewLink:
-        existingFolder.webViewLink ??
-        null,
-      parentId: memoriesFolder.id,
-    };
-  }
 
   const createdFolder =
     await createFolder(
@@ -249,6 +261,10 @@ export async function getOrCreateAlbumFolder(
     parentId: memoriesFolder.id,
   };
 }
+
+/* =========================================================
+   UPLOAD
+========================================================= */
 
 /**
  * Uploads a file into a specific
@@ -311,6 +327,10 @@ export async function uploadFileToDrive(
   };
 }
 
+/* =========================================================
+   UPDATE DRIVE FILE
+========================================================= */
+
 /**
  * Renames a Google Drive file or folder.
  */
@@ -356,6 +376,10 @@ export async function updateDriveFileName(
   };
 }
 
+/* =========================================================
+   DELETE SINGLE FILE
+========================================================= */
+
 /**
  * Permanently deletes a single
  * Google Drive file or folder.
@@ -366,24 +390,109 @@ export async function deleteDriveFile(
   const drive =
     await getGoogleDriveClient();
 
-  await drive.files.delete({
-    fileId,
-  });
+  try {
+    await drive.files.delete({
+      fileId,
+    });
+  } catch (error: unknown) {
+    const status =
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error
+        ? Number(
+            (error as { code?: unknown }).code
+          )
+        : undefined;
+
+    /*
+     * If the file is already gone,
+     * consider the operation complete.
+     */
+    if (status === 404) {
+      return;
+    }
+
+    throw error;
+  }
 }
+
+/* =========================================================
+   VERIFY DRIVE FOLDER
+========================================================= */
+
+/**
+ * Checks whether a Drive file/folder still exists.
+ *
+ * Returns false instead of throwing when
+ * Google Drive reports that it is gone.
+ */
+export async function driveItemExists(
+  fileId: string
+): Promise<boolean> {
+  const drive =
+    await getGoogleDriveClient();
+
+  try {
+    const response =
+      await drive.files.get({
+        fileId,
+        fields:
+          "id,name,mimeType,parents,trashed",
+      });
+
+    return Boolean(
+      response.data.id &&
+      !response.data.trashed
+    );
+  } catch (error: unknown) {
+    const status =
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error
+        ? Number(
+            (error as { code?: unknown }).code
+          )
+        : undefined;
+
+    if (status === 404) {
+      return false;
+    }
+
+    throw error;
+  }
+}
+
+/* =========================================================
+   RECURSIVE FOLDER DELETE
+========================================================= */
+
 /**
  * Recursively deletes a Google Drive
  * folder and everything contained inside.
  *
- * This is intentionally separate from
- * deleteDriveFile() because deleting a
- * folder alone should not be relied upon
- * to remove its descendants.
+ * IMPORTANT:
+ * The API route must verify that this
+ * folder belongs exclusively to the
+ * album being deleted before calling this.
  */
 export async function deleteDriveFolder(
   folderId: string
 ) {
   const drive =
     await getGoogleDriveClient();
+
+  /*
+   * First verify that the folder still exists.
+   *
+   * This makes deletion safe when a previous
+   * operation already removed the folder.
+   */
+  const exists =
+    await driveItemExists(folderId);
+
+  if (!exists) {
+    return;
+  }
 
   /*
    * Find every item directly inside
@@ -403,13 +512,11 @@ export async function deleteDriveFolder(
 
   /*
    * Delete children first.
-   *
-   * This ensures that media files
-   * physically disappear from
-   * Google Drive.
    */
   for (const child of children) {
-    if (!child.id) continue;
+    if (!child.id) {
+      continue;
+    }
 
     if (
       child.mimeType ===
@@ -419,16 +526,16 @@ export async function deleteDriveFolder(
         child.id
       );
     } else {
-      await drive.files.delete({
-        fileId: child.id,
-      });
+      await deleteDriveFile(
+        child.id
+      );
     }
   }
 
   /*
    * Finally delete the folder itself.
    */
-  await drive.files.delete({
-    fileId: folderId,
-  });
+  await deleteDriveFile(
+    folderId
+  );
 }

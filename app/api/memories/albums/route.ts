@@ -5,15 +5,17 @@ import {
 } from "@/lib/firestore/memories";
 
 import {
-  getOrCreateAlbumFolder,
+  createAlbumFolder,
+  deleteDriveFolder,
 } from "@/lib/google-drive";
 
 export async function POST(
   request: Request
 ) {
+  let driveFolderId: string | null = null;
+
   try {
-    const body =
-      await request.json();
+    const body = await request.json();
 
     const title =
       typeof body.title === "string"
@@ -38,8 +40,7 @@ export async function POST(
     if (!title) {
       return NextResponse.json(
         {
-          error:
-            "Album title is required.",
+          error: "Album title is required.",
         },
         {
           status: 400,
@@ -48,21 +49,22 @@ export async function POST(
     }
 
     /*
-     * Create the Google Drive folder
-     * for this album first.
+     * IMPORTANT:
+     *
+     * Always create a NEW Google Drive folder
+     * for every new album.
+     *
+     * We intentionally do NOT search for an
+     * existing folder with the same name.
      */
     const driveFolder =
-      await getOrCreateAlbumFolder(
-        title
-      );
+      await createAlbumFolder(title);
+
+    driveFolderId = driveFolder.id;
 
     /*
-     * Create the Firestore album
-     * using the Google Drive folder ID.
-     *
-     * File IDs are intentionally left
-     * undefined because the cover and
-     * media files are uploaded afterward.
+     * Create the Firestore album using the
+     * newly-created, unique Drive folder.
      */
     const albumId =
       await addFirestoreAlbum({
@@ -72,8 +74,7 @@ export async function POST(
         story,
         coverUrl: "",
         media: [],
-        driveFolderId:
-          driveFolder.id,
+        driveFolderId: driveFolder.id,
       });
 
     return NextResponse.json(
@@ -88,8 +89,7 @@ export async function POST(
           story,
           coverUrl: "",
           media: [],
-          driveFolderId:
-            driveFolder.id,
+          driveFolderId: driveFolder.id,
         },
 
         driveFolder,
@@ -103,6 +103,24 @@ export async function POST(
       "Create album error:",
       error
     );
+
+    /*
+     * If Firestore creation failed AFTER
+     * the Drive folder was created, clean up
+     * that newly-created folder.
+     */
+    if (driveFolderId) {
+      try {
+        await deleteDriveFolder(
+          driveFolderId
+        );
+      } catch (cleanupError) {
+        console.error(
+          "Failed to clean up orphaned Drive folder:",
+          cleanupError
+        );
+      }
+    }
 
     return NextResponse.json(
       {
