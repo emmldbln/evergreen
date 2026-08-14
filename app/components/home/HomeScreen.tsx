@@ -6,7 +6,7 @@ import SongCard from "../cards/SongCard";
 import CountdownCard from "../cards/CountdownCard";
 import GlassCard from "../ui/GlassCard";
 
-import { Heart, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
 
 import { usePlayback } from "@/lib/playback-store";
 
@@ -217,7 +217,7 @@ export default function HomeScreen({
                 }}
               >
                 Even on bad times,
-                you'll always have me.
+                you&apos;ll always have me.
               </p>
 
             </div>

@@ -306,20 +306,28 @@ export default function Background() {
     );
 
   useEffect(() => {
-    /**
-     * Read the user's saved settings after hydration.
-     */
-    setExperience(readExperienceSettings());
-
-    /**
-     * Listen for changes made by SettingsPage in the
-     * same browser tab.
-     */
-    function handleExperienceChange() {
+  /**
+   * Read the user's saved settings after hydration.
+   *
+   * Defer the state update so React can finish the
+   * initial render before synchronizing localStorage.
+   */
+  const initialSettingsTimer =
+    window.setTimeout(() => {
       setExperience(
         readExperienceSettings()
       );
-    }
+    }, 0);
+
+  /**
+   * Listen for changes made by SettingsPage in the
+   * same browser tab.
+   */
+  function handleExperienceChange() {
+    setExperience(
+      readExperienceSettings()
+    );
+  }
 
     window.addEventListener(
       "evergreen-experience-changed",
@@ -337,6 +345,9 @@ export default function Background() {
     );
 
     return () => {
+      window.clearTimeout(
+      initialSettingsTimer
+      );
       window.removeEventListener(
         "evergreen-experience-changed",
         handleExperienceChange

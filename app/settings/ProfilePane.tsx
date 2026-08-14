@@ -37,10 +37,13 @@ export default function ProfilePane() {
     useState(false);
 
   useEffect(() => {
+  const timer = window.setTimeout(() => {
     const profile = getProfile();
     const experience = getExperience();
 
-    setDisplayName(profile.displayName);
+    setDisplayName(
+      profile.displayName
+    );
 
     setFallingLeaves(
       experience.fallingLeaves
@@ -53,7 +56,12 @@ export default function ProfilePane() {
     setReducedMotion(
       experience.reducedMotion
     );
-  }, []);
+  }, 0);
+
+  return () => {
+    window.clearTimeout(timer);
+  };
+}, []);
 
   function handleSave() {
     const cleanedName =

@@ -57,7 +57,7 @@ export default function CountdownCard() {
           color: "#35543A",
         }}
       >
-        Since We've Been Together 💞
+        Since We&apos;ve Been Together 💞
       </h2>
 
       <div

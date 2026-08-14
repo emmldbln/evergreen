@@ -1709,7 +1709,7 @@ function AlbumDetail({
                 fontSize: 13,
               }}
             >
-              This album doesn't
+              This album doesn&apos;t
               have any media yet.
             </div>
           ) : (

@@ -8,8 +8,14 @@ export default function GreetingCard() {
   const [displayName, setDisplayName] = useState("Ann Kylie");
 
   useEffect(() => {
+  const timer = window.setTimeout(() => {
     setDisplayName(getDisplayName());
-  }, []);
+  }, 0);
+
+  return () => {
+    window.clearTimeout(timer);
+  };
+}, []);
 
   const hour = new Date().getHours();
 

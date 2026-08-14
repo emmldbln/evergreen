@@ -70,12 +70,24 @@ export default function SettingsPage() {
   ======================================================= */
 
   useEffect(() => {
+  const timer = window.setTimeout(() => {
     const profile = getProfile();
-    const experienceSettings = getExperience();
+    const experienceSettings =
+      getExperience();
 
-    setDisplayName(profile.displayName);
-    setExperience(experienceSettings);
-  }, []);
+    setDisplayName(
+      profile.displayName
+    );
+
+    setExperience(
+      experienceSettings
+    );
+  }, 0);
+
+  return () => {
+    window.clearTimeout(timer);
+  };
+}, []);
 
   /* =======================================================
      CLEANUP
