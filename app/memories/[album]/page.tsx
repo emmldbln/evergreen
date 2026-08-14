@@ -24,16 +24,22 @@ interface GalleryPhoto {
   id: string;
   name: string;
   url: string;
+  mimeType?: string;
 }
 
 interface GalleryVideo {
   id: string;
   name: string;
   url: string;
+  mimeType: string;
 }
 
-function getDriveFileUrl(fileId: string) {
-  return `/api/memories/files/${encodeURIComponent(fileId)}`;
+function getDriveFileUrl(
+  fileId: string
+) {
+  return `/api/memories/files/${encodeURIComponent(
+    fileId
+  )}`;
 }
 
 export default async function AlbumPage({
@@ -41,32 +47,33 @@ export default async function AlbumPage({
 }: Props) {
   const { album } = await params;
 
-  const data = await getFirestoreAlbum(album);
+  if (
+    typeof album !== "string" ||
+    album.trim().length === 0
+  ) {
+    notFound();
+  }
+
+  const data =
+    await getFirestoreAlbum(album);
 
   if (!data) {
     notFound();
   }
 
   /*
-   * ============================
-   * BUILD MEDIA LIST
-   * ============================
-   *
-   * mediaFiles is the preferred source.
-   *
-   * mediaFileIds remains as a fallback
-   * for albums created before structured
-   * media metadata was added.
+   * =====================================================
+   * MEDIA
+   * =====================================================
    */
 
-  const mediaFiles = data.mediaFiles ?? [];
+  const mediaFiles =
+    data.mediaFiles ?? [];
 
   /*
-   * Cover is stored separately in Firestore
-   * as coverFileId.
-   *
-   * We intentionally add it to the gallery
-   * so the cover is also part of the album.
+   * =====================================================
+   * COVER
+   * =====================================================
    */
 
   const coverPhoto: GalleryPhoto[] =
@@ -83,46 +90,69 @@ export default async function AlbumPage({
       : [];
 
   /*
-   * Convert structured Firestore media
-   * into the UI format.
+   * =====================================================
+   * PHOTOS
+   * =====================================================
    */
 
   const structuredPhotos: GalleryPhoto[] =
     mediaFiles
       .filter((file) =>
-        file.mimeType.startsWith("image/")
+        file.mimeType
+          ?.toLowerCase()
+          .startsWith("image/")
       )
       .map((file) => ({
         id: file.id,
         name: file.name,
-        url: getDriveFileUrl(file.id),
+        url: getDriveFileUrl(
+          file.id
+        ),
+        mimeType: file.mimeType,
       }));
+
+  /*
+   * =====================================================
+   * VIDEOS
+   * =====================================================
+   */
 
   const structuredVideos: GalleryVideo[] =
     mediaFiles
       .filter((file) =>
-        file.mimeType.startsWith("video/")
+        file.mimeType
+          ?.toLowerCase()
+          .startsWith("video/")
       )
       .map((file) => ({
         id: file.id,
         name: file.name,
-        url: getDriveFileUrl(file.id),
+        url: getDriveFileUrl(
+          file.id
+        ),
+        mimeType:
+          file.mimeType ||
+          "video/mp4",
       }));
 
   /*
-   * Prevent the cover from appearing twice
-   * if the cover was also uploaded as media.
+   * =====================================================
+   * PREVENT COVER DUPLICATION
+   * =====================================================
    */
 
   const photos: GalleryPhoto[] = [
     ...coverPhoto,
+
     ...structuredPhotos.filter(
       (photo) =>
-        photo.id !== data.coverFileId
+        photo.id !==
+        data.coverFileId
     ),
   ];
 
-  const videos = structuredVideos;
+  const videos =
+    structuredVideos;
 
   return (
     <main
@@ -130,7 +160,8 @@ export default async function AlbumPage({
         minHeight: "100vh",
         maxWidth: 1400,
         margin: "0 auto",
-        padding: "40px 32px 140px",
+        padding:
+          "40px 32px 140px",
       }}
     >
       {/* BACK BUTTON */}
@@ -146,12 +177,15 @@ export default async function AlbumPage({
         <Link
           href="/memories"
           style={{
-            display: "inline-flex",
+            display:
+              "inline-flex",
             alignItems: "center",
             gap: 10,
-            padding: "14px 22px",
+            padding:
+              "14px 22px",
             borderRadius: 999,
-            textDecoration: "none",
+            textDecoration:
+              "none",
             color: "#456C57",
             fontWeight: 600,
             background:
@@ -166,7 +200,9 @@ export default async function AlbumPage({
               "0 10px 30px rgba(0,0,0,.08)",
           }}
         >
-          <ArrowLeft size={20} />
+          <ArrowLeft
+            size={20}
+          />
 
           Back to Memories
         </Link>
@@ -180,13 +216,27 @@ export default async function AlbumPage({
           marginBottom: 70,
         }}
       >
+        <p
+          style={{
+            letterSpacing:
+              ".22em",
+            textTransform:
+              "uppercase",
+            fontSize: 12,
+            color: "#78907F",
+            marginBottom: 12,
+          }}
+        >
+          Memory Album
+        </p>
+
         <h1
           style={{
+            fontSize: 48,
+            color: "#456C57",
             fontFamily:
               "var(--font-serif)",
-            fontSize: 56,
-            color: "#456C57",
-            marginBottom: 10,
+            margin: 0,
           }}
         >
           {data.title}
@@ -195,8 +245,10 @@ export default async function AlbumPage({
         {data.date && (
           <p
             style={{
-              color: "#7E887F",
+              color: "#7A887C",
               fontSize: 18,
+              margin:
+                "14px 0 0",
             }}
           >
             {data.date}
@@ -206,10 +258,10 @@ export default async function AlbumPage({
         {data.location && (
           <p
             style={{
-              color: "#7E887F",
-              marginTop: 4,
-              marginBottom: 22,
+              color: "#7A887C",
               fontSize: 18,
+              margin:
+                "4px 0 0",
             }}
           >
             {data.location}
@@ -220,8 +272,10 @@ export default async function AlbumPage({
           <p
             style={{
               maxWidth: 850,
-              margin: "0 auto",
-              color: "#58665C",
+              margin:
+                "18px auto 0",
+              color:
+                "#58665C",
               lineHeight: 1.9,
               fontSize: 18,
             }}
@@ -238,7 +292,8 @@ export default async function AlbumPage({
           <div
             style={{
               display: "flex",
-              alignItems: "center",
+              alignItems:
+                "center",
               gap: 12,
               marginBottom: 24,
             }}
@@ -251,9 +306,11 @@ export default async function AlbumPage({
             <h2
               style={{
                 fontSize: 34,
-                color: "#456C57",
+                color:
+                  "#456C57",
                 fontFamily:
                   "var(--font-serif)",
+                margin: 0,
               }}
             >
               Photos
@@ -261,7 +318,8 @@ export default async function AlbumPage({
 
             <span
               style={{
-                color: "#7A887C",
+                color:
+                  "#7A887C",
                 fontSize: 18,
               }}
             >
@@ -269,7 +327,9 @@ export default async function AlbumPage({
             </span>
           </div>
 
-          <GalleryGrid photos={photos} />
+          <GalleryGrid
+            photos={photos}
+          />
         </>
       )}
 
@@ -280,7 +340,8 @@ export default async function AlbumPage({
           <div
             style={{
               display: "flex",
-              alignItems: "center",
+              alignItems:
+                "center",
               gap: 12,
               marginTop:
                 photos.length > 0
@@ -297,9 +358,11 @@ export default async function AlbumPage({
             <h2
               style={{
                 fontSize: 34,
-                color: "#456C57",
+                color:
+                  "#456C57",
                 fontFamily:
                   "var(--font-serif)",
+                margin: 0,
               }}
             >
               Videos
@@ -307,7 +370,8 @@ export default async function AlbumPage({
 
             <span
               style={{
-                color: "#7A887C",
+                color:
+                  "#7A887C",
                 fontSize: 18,
               }}
             >
@@ -323,12 +387,14 @@ export default async function AlbumPage({
               gap: 28,
             }}
           >
-            {videos.map((video) => (
-              <VideoCard
-                key={video.id}
-                src={video.url}
-              />
-            ))}
+            {videos.map(
+              (video) => (
+                <VideoCard
+                  key={video.id}
+                  src={video.url}
+                  />
+              )
+            )}
           </div>
         </>
       )}
@@ -340,8 +406,10 @@ export default async function AlbumPage({
           <div
             style={{
               textAlign: "center",
-              padding: "80px 20px",
-              color: "#7A887C",
+              padding:
+                "80px 20px",
+              color:
+                "#7A887C",
             }}
           >
             <p
@@ -350,13 +418,14 @@ export default async function AlbumPage({
                 marginBottom: 8,
               }}
             >
-              This album is still empty.
+              This album is
+              still empty.
             </p>
 
             <p>
-              Photos and videos will
-              appear here once they
-              are added.
+              Photos and videos
+              will appear here
+              once they are added.
             </p>
           </div>
         )}
