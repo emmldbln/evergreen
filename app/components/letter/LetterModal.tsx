@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { X } from "lucide-react";
-import { Letter } from "./letters";
+import type { Letter } from "./letters";
 
 interface Props {
   letter: Letter | null;

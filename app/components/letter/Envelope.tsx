@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Letter } from "./letters";
+import type { Letter } from "./letters";
 
 interface Props {
   letter: Letter;

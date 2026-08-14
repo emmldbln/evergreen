@@ -5,13 +5,8 @@ import { AnimatePresence } from "framer-motion";
 
 import Envelope from "../components/letter/Envelope";
 import LetterModal from "../components/letter/LetterModal";
+import type { Letter } from "../components/letter/letters";
 
-interface Letter {
-  id: string;
-  title: string;
-  subtitle: string;
-  content: string;
-}
 
 interface LetterPageClientProps {
   letters: Letter[];
