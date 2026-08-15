@@ -106,10 +106,11 @@ export async function getGoogleDriveClient() {
 
   const cookieStore = await cookies();
 
-  const refreshToken =
-    cookieStore.get(
-      "google_drive_refresh_token"
-    )?.value;
+const refreshToken =
+  process.env.GOOGLE_DRIVE_REFRESH_TOKEN ||
+  cookieStore.get(
+    "google_drive_refresh_token"
+  )?.value;
 
   if (!refreshToken) {
     throw new Error(
