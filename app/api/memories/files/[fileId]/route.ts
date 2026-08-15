@@ -13,14 +13,12 @@ export async function GET(
   }
 ) {
   try {
-    const { fileId } =
-      await context.params;
+    const { fileId } = await context.params;
 
     if (!fileId) {
       return NextResponse.json(
         {
-          error:
-            "File ID is required.",
+          error: "File ID is required.",
         },
         {
           status: 400,
@@ -32,14 +30,15 @@ export async function GET(
       await getGoogleDriveClient();
 
     /*
-     * Get metadata first.
+     * =====================================================
+     * GET FILE METADATA
+     * =====================================================
      */
 
     const file =
       await drive.files.get({
         fileId,
-        fields:
-          "id,name,mimeType,size",
+        fields: "id,name,mimeType,size",
       });
 
     const mimeType =
@@ -58,21 +57,166 @@ export async function GET(
     }
 
     /*
-     * =====================================================
-     * RANGE SUPPORT
-     * =====================================================
-     *
-     * This is especially important for video.
-     *
-     * Browsers don't necessarily download an entire
-     * video before playing it. They request portions
-     * of the file using:
-     *
-     * Range: bytes=...
+     * Google Drive returns the file size as a string.
      */
 
-    const range =
+    const fileSize = Number(
+      file.data.size
+    );
+
+    if (!Number.isFinite(fileSize)) {
+      return NextResponse.json(
+        {
+          error:
+            "Google Drive file size is unavailable.",
+        },
+        {
+          status: 500,
+        }
+      );
+    }
+
+    /*
+     * =====================================================
+     * RANGE
+     * =====================================================
+     */
+
+    const rangeHeader =
       request.headers.get("range");
+
+    let start = 0;
+    let end = fileSize - 1;
+    let isPartial = false;
+
+    if (rangeHeader) {
+      const match =
+        rangeHeader.match(
+          /^bytes=(\d*)-(\d*)$/
+        );
+
+      if (!match) {
+        return new NextResponse(null, {
+          status: 416,
+          headers: {
+            "Content-Range":
+              `bytes */${fileSize}`,
+          },
+        });
+      }
+
+      const requestedStart =
+        match[1];
+
+      const requestedEnd =
+        match[2];
+
+      /*
+       * bytes=-500
+       *
+       * Return the final 500 bytes.
+       */
+      if (
+        !requestedStart &&
+        requestedEnd
+      ) {
+        const suffixLength =
+          Number(requestedEnd);
+
+        if (
+          !Number.isFinite(
+            suffixLength
+          ) ||
+          suffixLength <= 0
+        ) {
+          return new NextResponse(
+            null,
+            {
+              status: 416,
+              headers: {
+                "Content-Range":
+                  `bytes */${fileSize}`,
+              },
+            }
+          );
+        }
+
+        start = Math.max(
+          0,
+          fileSize - suffixLength
+        );
+
+        end = fileSize - 1;
+      } else {
+        /*
+         * bytes=START-END
+         */
+        start = Number(
+          requestedStart
+        );
+
+        if (
+          !Number.isFinite(start) ||
+          start < 0 ||
+          start >= fileSize
+        ) {
+          return new NextResponse(
+            null,
+            {
+              status: 416,
+              headers: {
+                "Content-Range":
+                  `bytes */${fileSize}`,
+              },
+            }
+          );
+        }
+
+        if (requestedEnd) {
+          end = Number(
+            requestedEnd
+          );
+        } else {
+          end = fileSize - 1;
+        }
+
+        if (
+          !Number.isFinite(end) ||
+          end < start
+        ) {
+          return new NextResponse(
+            null,
+            {
+              status: 416,
+              headers: {
+                "Content-Range":
+                  `bytes */${fileSize}`,
+              },
+            }
+          );
+        }
+
+        /*
+         * Never allow the requested range
+         * to go beyond the actual file.
+         */
+        end = Math.min(
+          end,
+          fileSize - 1
+        );
+      }
+
+      isPartial = true;
+    }
+
+    const contentLength =
+      end - start + 1;
+
+    /*
+     * =====================================================
+     * REQUEST FILE FROM GOOGLE DRIVE
+     * =====================================================
+     */
 
     const driveResponse =
       await drive.files.get(
@@ -82,14 +226,10 @@ export async function GET(
         },
         {
           responseType: "stream",
-
-          ...(range
-            ? {
-                headers: {
-                  Range: range,
-                },
-              }
-            : {}),
+          headers: {
+            Range:
+              `bytes=${start}-${end}`,
+          },
         }
       );
 
@@ -97,9 +237,9 @@ export async function GET(
       driveResponse.data;
 
     /*
-     * Convert Node.js stream into
-     * a Web ReadableStream that
-     * NextResponse can return.
+     * =====================================================
+     * CONVERT NODE STREAM -> WEB STREAM
+     * =====================================================
      */
 
     const webStream =
@@ -109,9 +249,7 @@ export async function GET(
             "data",
             (chunk) => {
               controller.enqueue(
-                new Uint8Array(
-                  chunk
-                )
+                new Uint8Array(chunk)
               );
             }
           );
@@ -158,54 +296,34 @@ export async function GET(
     );
 
     responseHeaders.set(
+      "Content-Length",
+      String(contentLength)
+    );
+
+    responseHeaders.set(
       "Cache-Control",
       "private, max-age=3600"
     );
 
-    /*
-     * Preserve Google Drive's
-     * range response information.
-     */
-
-    const contentLength =
-      driveResponse.headers[
-        "content-length"
-      ];
-
-    const contentRange =
-      driveResponse.headers[
-        "content-range"
-      ];
-
-    if (contentLength) {
-      responseHeaders.set(
-        "Content-Length",
-        String(contentLength)
-      );
-    }
-
-    if (contentRange) {
+    if (isPartial) {
       responseHeaders.set(
         "Content-Range",
-        String(contentRange)
+        `bytes ${start}-${end}/${fileSize}`
       );
     }
 
     /*
-     * Google Drive normally returns
-     * 206 when a valid Range request
-     * is supplied.
+     * =====================================================
+     * RESPONSE
+     * =====================================================
      */
-
-    const status =
-      range && contentRange
-        ? 206
-        : 200;
 
     return new NextResponse(
       webStream,
       {
-        status,
+        status: isPartial
+          ? 206
+          : 200,
         headers:
           responseHeaders,
       }
