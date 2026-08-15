@@ -5,79 +5,84 @@ import {
 } from "@/lib/firestore/memories";
 
 export default async function MemoriesPage() {
-  const firestoreAlbums = await getFirestoreAlbums();
+  const firestoreAlbums =
+    await getFirestoreAlbums();
 
-  const albums = firestoreAlbums.map((album) => {
-    /*
-     * Google Drive media files.
-     *
-     * The cover is stored separately from mediaFileIds,
-     * so we include it in the public album media list
-     * for counting/display purposes.
-     *
-     * We use a Set so the cover is NOT counted twice if
-     * it is already present inside mediaFileIds.
-     */
-    const mediaFileIds = album.mediaFileIds ?? [];
+  const albums =
+    firestoreAlbums.map((album) => {
+      /*
+       * Google Drive media files.
+       *
+       * The cover is stored separately from
+       * mediaFileIds, so include it in the
+       * public album media list.
+       *
+       * Use a Set so the cover is not counted
+       * twice if it already exists in mediaFileIds.
+       */
 
-    const allMediaFileIds = album.coverFileId
-      ? Array.from(
-          new Set([
-            album.coverFileId,
-            ...mediaFileIds,
-          ])
-        )
-      : mediaFileIds;
+      const mediaFileIds =
+        album.mediaFileIds ?? [];
 
-    const media =
-      allMediaFileIds.length > 0
-        ? allMediaFileIds.map(
-            (fileId) =>
-              `/api/memories/files/${encodeURIComponent(
-                fileId
-              )}`
-          )
-        : album.media ?? [];
+      const allMediaFileIds =
+        album.coverFileId
+          ? Array.from(
+              new Set([
+                album.coverFileId,
+                ...mediaFileIds,
+              ])
+            )
+          : mediaFileIds;
 
-    /*
-     * Google Drive cover
-     */
-    const cover = album.coverFileId
-      ? `/api/memories/files/${encodeURIComponent(
-          album.coverFileId
-        )}`
-      : album.coverUrl ?? "";
-
-    return {
-      id: album.id,
-
-      title: album.title,
-
-      date: album.date ?? "",
-
-      location:
-        album.location ?? "",
-
-      story:
-        album.story ?? "",
-
-      cover,
+      const media =
+        allMediaFileIds.length > 0
+          ? allMediaFileIds.map(
+              (fileId) =>
+                `/api/memories/files/${encodeURIComponent(
+                  fileId
+                )}`
+            )
+          : album.media ?? [];
 
       /*
-       * Includes the cover in the total memory count.
-       *
-       * Example:
-       * 1 cover + 2 photos + 1 video = 4 Memories
+       * Google Drive cover.
        */
-      media,
-    };
-  });
+
+      const cover = album.coverFileId
+        ? `/api/memories/files/${encodeURIComponent(
+            album.coverFileId
+          )}`
+        : album.coverUrl ?? "";
+
+      return {
+        id: album.id,
+
+        title: album.title,
+
+        date: album.date ?? "",
+
+        location:
+          album.location ?? "",
+
+        story:
+          album.story ?? "",
+
+        cover,
+
+        /*
+         * Includes the cover in the
+         * total memory count.
+         */
+        media,
+      };
+    });
 
   return (
     <main
       style={{
         minHeight: "100vh",
-        padding: "70px 32px 130px",
+        padding:
+          "70px 32px 130px",
         maxWidth: 1450,
         margin: "0 auto",
       }}
@@ -92,8 +97,10 @@ export default async function MemoriesPage() {
           style={{
             margin: 0,
             marginBottom: 14,
-            fontFamily: "var(--font-serif)",
-            fontSize: "clamp(42px,5vw,60px)",
+            fontFamily:
+              "var(--font-serif)",
+            fontSize:
+              "clamp(42px,5vw,60px)",
             color: "#456C57",
           }}
         >
@@ -104,7 +111,8 @@ export default async function MemoriesPage() {
           style={{
             margin: "0 auto",
             color: "#748574",
-            fontSize: "clamp(16px,2vw,20px)",
+            fontSize:
+              "clamp(16px,2vw,20px)",
             lineHeight: 1.8,
             maxWidth: 720,
           }}
@@ -117,7 +125,9 @@ export default async function MemoriesPage() {
         </p>
       </div>
 
-      <AlbumGrid albums={albums} />
+      <AlbumGrid
+        albums={albums}
+      />
     </main>
   );
 }

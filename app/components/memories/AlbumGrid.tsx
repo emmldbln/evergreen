@@ -7,16 +7,16 @@ interface Props {
   albums: Album[];
 }
 
-export default function AlbumGrid({ albums }: Props) {
+export default function AlbumGrid({
+  albums,
+}: Props) {
   return (
     <div
       style={{
         display: "grid",
 
         gridTemplateColumns:
-          "repeat(auto-fit, minmax(320px, 380px))",
-
-        justifyContent: "center",
+          "repeat(3, minmax(0, 1fr))",
 
         gap: 32,
 

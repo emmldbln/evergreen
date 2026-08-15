@@ -11,7 +11,6 @@ import {
   getFirestoreAlbum,
 } from "@/lib/firestore/memories";
 
-import VideoCard from "@/app/components/memories/VideoCard";
 import GalleryGrid from "@/app/components/memories/GalleryGrid";
 
 interface Props {
@@ -164,7 +163,9 @@ export default async function AlbumPage({
           "40px 32px 140px",
       }}
     >
-      {/* BACK BUTTON */}
+      {/* =================================================
+          BACK BUTTON
+      ================================================= */}
 
       <div
         style={{
@@ -177,15 +178,13 @@ export default async function AlbumPage({
         <Link
           href="/memories"
           style={{
-            display:
-              "inline-flex",
+            display: "inline-flex",
             alignItems: "center",
             gap: 10,
             padding:
               "14px 22px",
             borderRadius: 999,
-            textDecoration:
-              "none",
+            textDecoration: "none",
             color: "#456C57",
             fontWeight: 600,
             background:
@@ -200,15 +199,15 @@ export default async function AlbumPage({
               "0 10px 30px rgba(0,0,0,.08)",
           }}
         >
-          <ArrowLeft
-            size={20}
-          />
+          <ArrowLeft size={20} />
 
           Back to Memories
         </Link>
       </div>
 
-      {/* HEADER */}
+      {/* =================================================
+          HEADER
+      ================================================= */}
 
       <div
         style={{
@@ -218,10 +217,8 @@ export default async function AlbumPage({
       >
         <p
           style={{
-            letterSpacing:
-              ".22em",
-            textTransform:
-              "uppercase",
+            letterSpacing: ".22em",
+            textTransform: "uppercase",
             fontSize: 12,
             color: "#78907F",
             marginBottom: 12,
@@ -274,8 +271,7 @@ export default async function AlbumPage({
               maxWidth: 850,
               margin:
                 "18px auto 0",
-              color:
-                "#58665C",
+              color: "#58665C",
               lineHeight: 1.9,
               fontSize: 18,
             }}
@@ -285,15 +281,16 @@ export default async function AlbumPage({
         )}
       </div>
 
-      {/* PHOTOS */}
+      {/* =================================================
+          PHOTOS
+      ================================================= */}
 
       {photos.length > 0 && (
         <>
           <div
             style={{
               display: "flex",
-              alignItems:
-                "center",
+              alignItems: "center",
               gap: 12,
               marginBottom: 24,
             }}
@@ -306,8 +303,7 @@ export default async function AlbumPage({
             <h2
               style={{
                 fontSize: 34,
-                color:
-                  "#456C57",
+                color: "#456C57",
                 fontFamily:
                   "var(--font-serif)",
                 margin: 0,
@@ -318,8 +314,7 @@ export default async function AlbumPage({
 
             <span
               style={{
-                color:
-                  "#7A887C",
+                color: "#7A887C",
                 fontSize: 18,
               }}
             >
@@ -333,15 +328,16 @@ export default async function AlbumPage({
         </>
       )}
 
-      {/* VIDEOS */}
+      {/* =================================================
+          VIDEOS
+      ================================================= */}
 
       {videos.length > 0 && (
         <>
           <div
             style={{
               display: "flex",
-              alignItems:
-                "center",
+              alignItems: "center",
               gap: 12,
               marginTop:
                 photos.length > 0
@@ -358,8 +354,7 @@ export default async function AlbumPage({
             <h2
               style={{
                 fontSize: 34,
-                color:
-                  "#456C57",
+                color: "#456C57",
                 fontFamily:
                   "var(--font-serif)",
                 margin: 0,
@@ -370,8 +365,7 @@ export default async function AlbumPage({
 
             <span
               style={{
-                color:
-                  "#7A887C",
+                color: "#7A887C",
                 fontSize: 18,
               }}
             >
@@ -383,23 +377,53 @@ export default async function AlbumPage({
             style={{
               display: "grid",
               gridTemplateColumns:
-                "repeat(auto-fit,minmax(420px,1fr))",
+                "repeat(auto-fit, minmax(420px, 1fr))",
               gap: 28,
             }}
           >
-            {videos.map(
-              (video) => (
-                <VideoCard
-                  key={video.id}
-                  src={video.url}
+            {videos.map((video) => (
+              <div
+                key={video.id}
+                style={{
+                  position: "relative",
+                  width: "100%",
+                  aspectRatio: "16 / 9",
+                  overflow: "hidden",
+                  borderRadius: 26,
+                  background: "#000",
+                  boxShadow:
+                    "0 18px 45px rgba(0,0,0,.16)",
+                }}
+              >
+                <video
+                  controls
+                  playsInline
+                  preload="metadata"
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    display: "block",
+                    objectFit: "cover",
+                    background: "#000",
+                  }}
+                >
+                  <source
+                    src={video.url}
+                    type={video.mimeType}
                   />
-              )
-            )}
+
+                  Your browser does not support
+                  video playback.
+                </video>
+              </div>
+            ))}
           </div>
         </>
       )}
 
-      {/* EMPTY ALBUM */}
+      {/* =================================================
+          EMPTY ALBUM
+      ================================================= */}
 
       {photos.length === 0 &&
         videos.length === 0 && (
@@ -408,8 +432,7 @@ export default async function AlbumPage({
               textAlign: "center",
               padding:
                 "80px 20px",
-              color:
-                "#7A887C",
+              color: "#7A887C",
             }}
           >
             <p
