@@ -379,6 +379,7 @@ export default async function AlbumPage({
               gridTemplateColumns:
                 "repeat(auto-fit, minmax(420px, 1fr))",
               gap: 28,
+              alignItems: "start",
             }}
           >
             {videos.map((video) => (
@@ -387,7 +388,6 @@ export default async function AlbumPage({
                 style={{
                   position: "relative",
                   width: "100%",
-                  aspectRatio: "16 / 9",
                   overflow: "hidden",
                   borderRadius: 26,
                   background: "#000",
@@ -396,25 +396,21 @@ export default async function AlbumPage({
                 }}
               >
                 <video
-                  controls
-                  playsInline
-                  preload="metadata"
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    display: "block",
-                    objectFit: "cover",
-                    background: "#000",
-                  }}
-                >
-                  <source
-                    src={video.url}
-                    type={video.mimeType}
-                  />
-
-                  Your browser does not support
-                  video playback.
-                </video>
+  controls
+  playsInline
+  preload="metadata"
+  src={video.url}
+  style={{
+    width: "100%",
+    height: "100%",
+    display: "block",
+    objectFit: "cover",
+    background: "#000",
+  }}
+>
+  Your browser does not support
+  video playback.
+</video>
               </div>
             ))}
           </div>

@@ -105,8 +105,11 @@ export async function POST(
     }
 
     /*
-     * Media uploads must be
-     * images or videos.
+     * Media uploads can be images or videos.
+     *
+     * MOV files are intentionally uploaded
+     * in their original format. No server-side
+     * conversion is performed.
      */
     if (
       type === "media" &&
@@ -125,8 +128,17 @@ export async function POST(
     }
 
     /*
-     * Upload physical file to the
-     * album's Google Drive folder.
+     * Upload the original file directly to
+     * the album's Google Drive folder.
+     *
+     * This preserves:
+     * - original filename
+     * - original file format
+     * - original resolution
+     * - original video quality
+     *
+     * This also avoids the processing time
+     * required by server-side FFmpeg conversion.
      */
     const uploadedFile =
       await uploadFileToDrive(
@@ -151,8 +163,8 @@ export async function POST(
       ) {
         try {
           await deleteDriveFile(
-          album.coverFileId
-              );
+            album.coverFileId
+          );
         } catch (error) {
           console.error(
             "Failed to delete previous cover:",
