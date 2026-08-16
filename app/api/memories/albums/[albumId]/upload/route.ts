@@ -10,6 +10,10 @@ import {
   deleteDriveFile,
 } from "@/lib/google-drive";
 
+import {
+  remuxMovToMp4,
+} from "@/lib/video-conversion";
+
 interface RouteContext {
   params: Promise<{
     albumId: string;
@@ -24,13 +28,22 @@ export async function POST(
     const { albumId } =
       await context.params;
 
+    /*
+     * =====================================================
+     * ALBUM
+     * =====================================================
+     */
+
     const album =
-      await getFirestoreAlbum(albumId);
+      await getFirestoreAlbum(
+        albumId
+      );
 
     if (!album) {
       return NextResponse.json(
         {
-          error: "Album not found.",
+          error:
+            "Album not found.",
         },
         {
           status: 404,
@@ -49,6 +62,12 @@ export async function POST(
         }
       );
     }
+
+    /*
+     * =====================================================
+     * FORM DATA
+     * =====================================================
+     */
 
     const formData =
       await request.formData();
@@ -87,75 +106,285 @@ export async function POST(
     }
 
     /*
-     * Cover uploads must be images.
+     * =====================================================
+     * UPLOAD DEBUG INFORMATION
+     * =====================================================
+     *
+     * This intentionally runs BEFORE MOV detection.
+     *
+     * We need to confirm exactly what the browser /
+     * FormData is sending to the server.
      */
-    if (
-      type === "cover" &&
-      !file.type.startsWith("image/")
-    ) {
-      return NextResponse.json(
-        {
-          error:
-            "Album covers must be image files.",
-        },
-        {
-          status: 400,
-        }
+
+    const isMovByName =
+      /\.mov$/i.test(
+        file.name
       );
+
+    const isQuickTimeMime =
+      file.type ===
+      "video/quicktime";
+
+    const isVideo =
+      file.type.startsWith(
+        "video/"
+      );
+
+    const isImage =
+      file.type.startsWith(
+        "image/"
+      );
+
+    console.log(
+      "[Evergreen] Upload received:",
+      {
+        name:
+          file.name,
+
+        type:
+          file.type,
+
+        size:
+          file.size,
+
+        uploadType:
+          type,
+
+        isImage,
+
+        isVideo,
+
+        isMovByName,
+
+        isQuickTimeMime,
+
+        isMov:
+          isMovByName ||
+          isQuickTimeMime,
+      }
+    );
+
+    /*
+     * =====================================================
+     * FILE VALIDATION
+     * =====================================================
+     */
+
+    if (type === "cover") {
+      if (!isImage) {
+        return NextResponse.json(
+          {
+            error:
+              "Album covers must be image files.",
+          },
+          {
+            status: 400,
+          }
+        );
+      }
+    }
+
+    if (type === "media") {
+      if (
+        !isImage &&
+        !isVideo
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "Album media must be an image or video.",
+          },
+          {
+            status: 400,
+          }
+        );
+      }
     }
 
     /*
-     * Media uploads can be images or videos.
+     * =====================================================
+     * PREPARE FILE
+     * =====================================================
      *
-     * MOV files are intentionally uploaded
-     * in their original format. No server-side
-     * conversion is performed.
+     * Images:
+     *   Uploaded untouched.
+     *
+     * MP4:
+     *   Uploaded untouched.
+     *
+     * MOV:
+     *   Sent through remuxMovToMp4().
+     *
+     * The conversion helper is responsible for:
+     *
+     *   Video -> copied
+     *   Audio -> re-encoded
+     *
+     * so we can preserve the original video while
+     * attempting to eliminate the browser audio issue.
      */
+
+    let fileToUpload =
+      file;
+
+    const isMov =
+      isMovByName ||
+      isQuickTimeMime;
+
+    /*
+     * =====================================================
+     * MOV CONVERSION
+     * =====================================================
+     */
+
     if (
       type === "media" &&
-      !file.type.startsWith("image/") &&
-      !file.type.startsWith("video/")
+      isMov
     ) {
-      return NextResponse.json(
+      console.log(
+        "[Evergreen] ========================================"
+      );
+
+      console.log(
+        "[Evergreen] MOV DETECTED"
+      );
+
+      console.log(
+        "[Evergreen] Starting video conversion..."
+      );
+
+      console.log(
+        "[Evergreen] Source file:",
         {
-          error:
-            "Album media must be an image or video.",
-        },
+          name:
+            file.name,
+
+          type:
+            file.type,
+
+          size:
+            file.size,
+        }
+      );
+
+      console.log(
+        "[Evergreen] Calling remuxMovToMp4()..."
+      );
+
+      try {
+        fileToUpload =
+          await remuxMovToMp4(
+            file
+          );
+      } catch (error) {
+        console.error(
+          "[Evergreen] MOV conversion FAILED:",
+          error
+        );
+
+        throw error;
+      }
+
+      console.log(
+        "[Evergreen] remuxMovToMp4() returned successfully."
+      );
+
+      console.log(
+        "[Evergreen] Converted file:",
         {
-          status: 400,
+          name:
+            fileToUpload.name,
+
+          type:
+            fileToUpload.type,
+
+          originalSize:
+            file.size,
+
+          convertedSize:
+            fileToUpload.size,
+        }
+      );
+
+      console.log(
+        "[Evergreen] MOV conversion complete."
+      );
+
+      console.log(
+        "[Evergreen] ========================================"
+      );
+    } else {
+      console.log(
+        "[Evergreen] No MOV conversion required:",
+        {
+          uploadType:
+            type,
+
+          name:
+            file.name,
+
+          type:
+            file.type,
+
+          isMov,
         }
       );
     }
 
     /*
-     * Upload the original file directly to
-     * the album's Google Drive folder.
-     *
-     * This preserves:
-     * - original filename
-     * - original file format
-     * - original resolution
-     * - original video quality
-     *
-     * This also avoids the processing time
-     * required by server-side FFmpeg conversion.
+     * =====================================================
+     * GOOGLE DRIVE UPLOAD
+     * =====================================================
      */
+
+    console.log(
+      "[Evergreen] Uploading file to Google Drive:",
+      {
+        name:
+          fileToUpload.name,
+
+        type:
+          fileToUpload.type,
+
+        size:
+          fileToUpload.size,
+      }
+    );
+
     const uploadedFile =
       await uploadFileToDrive(
-        file,
+        fileToUpload,
         album.driveFolderId
       );
 
-    if (type === "cover") {
+    console.log(
+      "[Evergreen] Google Drive upload complete:",
+      {
+        id:
+          uploadedFile.id,
+
+        name:
+          uploadedFile.name,
+
+        mimeType:
+          uploadedFile.mimeType,
+      }
+    );
+
+    /*
+     * =====================================================
+     * COVER
+     * =====================================================
+     */
+
+    if (
+      type === "cover"
+    ) {
       /*
-       * If an old cover exists,
-       * remove it from Drive.
-       *
-       * We intentionally do this AFTER
-       * the new file has uploaded so
-       * a failed upload doesn't destroy
-       * the existing cover.
+       * Delete the previous cover only after
+       * the replacement has successfully uploaded.
        */
+
       if (
         album.coverFileId &&
         album.coverFileId !==
@@ -167,7 +396,7 @@ export async function POST(
           );
         } catch (error) {
           console.error(
-            "Failed to delete previous cover:",
+            "[Evergreen] Failed to delete previous cover:",
             error
           );
         }
@@ -186,16 +415,22 @@ export async function POST(
       );
     } else {
       /*
-       * Add the new media file.
+       * ===================================================
+       * MEDIA
+       * ===================================================
        */
+
       const mediaFileIds =
-        album.mediaFileIds ?? [];
+        album.mediaFileIds ??
+        [];
 
       const mediaFiles =
-        album.mediaFiles ?? [];
+        album.mediaFiles ??
+        [];
 
       const media =
-        album.media ?? [];
+        album.media ??
+        [];
 
       await updateFirestoreAlbum(
         albumId,
@@ -208,8 +443,12 @@ export async function POST(
           mediaFiles: [
             ...mediaFiles,
             {
-              id: uploadedFile.id,
-              name: uploadedFile.name,
+              id:
+                uploadedFile.id,
+
+              name:
+                uploadedFile.name,
+
               mimeType:
                 uploadedFile.mimeType,
             },
@@ -217,12 +456,19 @@ export async function POST(
 
           media: [
             ...media,
+
             uploadedFile.webViewLink ??
               "",
           ],
         }
       );
     }
+
+    /*
+     * =====================================================
+     * RETURN UPDATED ALBUM
+     * =====================================================
+     */
 
     const updatedAlbum =
       await getFirestoreAlbum(
@@ -231,15 +477,24 @@ export async function POST(
 
     return NextResponse.json(
       {
-        success: true,
+        success:
+          true,
+
         type,
+
         file: {
-          id: uploadedFile.id,
-          name: uploadedFile.name,
+          id:
+            uploadedFile.id,
+
+          name:
+            uploadedFile.name,
+
           mimeType:
             uploadedFile.mimeType,
         },
-        album: updatedAlbum,
+
+        album:
+          updatedAlbum,
       },
       {
         status: 200,
@@ -247,7 +502,7 @@ export async function POST(
     );
   } catch (error) {
     console.error(
-      "Upload memory file error:",
+      "[Evergreen] Upload memory file error:",
       error
     );
 

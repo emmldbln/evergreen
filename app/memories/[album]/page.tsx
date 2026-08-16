@@ -398,13 +398,12 @@ export default async function AlbumPage({
                 <video
   controls
   playsInline
-  preload="metadata"
+  preload="auto"
   src={video.url}
   style={{
     width: "100%",
-    height: "100%",
+    height: "auto",
     display: "block",
-    objectFit: "cover",
     background: "#000",
   }}
 >
