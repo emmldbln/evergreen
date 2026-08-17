@@ -41,8 +41,8 @@ Evergreen separates application metadata from large media assets:
 
 ```text
                         ┌─────────────────────┐
-                        │      Next.js App     │
-                        │   React + TypeScript │
+                        │      Next.js App    │
+                        │   React + TypeScript│
                         └──────────┬──────────┘
                                    │
                   ┌────────────────┼────────────────┐
